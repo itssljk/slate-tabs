@@ -49,6 +49,9 @@ export default function RootLayout({
                   
                   var perf = localStorage.getItem('slate-settings-perf') === 'true';
                   document.documentElement.setAttribute('data-perf', perf ? 'true' : 'false');
+
+                  var accent = localStorage.getItem('slate-accent') || 'sage';
+                  document.documentElement.setAttribute('data-accent', accent);
                 } catch (e) {}
               })();
             `,

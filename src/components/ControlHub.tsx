@@ -1,10 +1,20 @@
 "use client";
-
+ 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { X, Shield, Eye, Cpu } from "lucide-react";
-
+import { X, Shield, Eye, Cpu, User, Palette } from "lucide-react";
+ 
 type Theme = "dark" | "light";
 
+const ACCENT_PRESETS = [
+  { id: "sage", name: "Sage", color: "#7ca38e", lightColor: "#A35C36" },
+  { id: "emerald", name: "Emerald", color: "#10B981", lightColor: "#059669" },
+  { id: "violet", name: "Violet", color: "#A78BFA", lightColor: "#7C3AED" },
+  { id: "amber", name: "Amber", color: "#FBBF24", lightColor: "#D97706" },
+  { id: "rose", name: "Rose", color: "#FB7185", lightColor: "#E11D48" },
+  { id: "cyan", name: "Cyan", color: "#22D3EE", lightColor: "#0891B2" },
+  { id: "slate", name: "Slate", color: "#94A3B8", lightColor: "#475569" }
+];
+ 
 function getInitialTheme(): Theme {
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem("slate-theme");
@@ -13,75 +23,94 @@ function getInitialTheme(): Theme {
   }
   return "dark";
 }
-
+ 
 export default function ControlHub() {
   const [mounted, setMounted] = useState(false);
   const [theme, setTheme] = useState<Theme>("dark");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
+ 
   // Settings States
   const [glowEnabled, setGlowEnabled] = useState(true);
   const [minimalLayout, setMinimalLayout] = useState(false);
   const [performanceMode, setPerformanceMode] = useState(false);
-
+  const [username, setUsername] = useState("");
+  const [accentColor, setAccentColor] = useState("sage");
+ 
   const containerRef = useRef<HTMLDivElement>(null);
-
+ 
   // Initialize states on mount (avoid Next.js hydration mismatch)
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(getInitialTheme());
-
+ 
     const savedGlow = localStorage.getItem("slate-settings-glow") !== "false";
     const savedMinimal = localStorage.getItem("slate-settings-minimal") === "true";
     const savedPerf = localStorage.getItem("slate-settings-perf") === "true";
-
+    const savedUsername = localStorage.getItem("slate-username") || "";
+    const savedAccent = localStorage.getItem("slate-accent") || "sage";
+ 
     setGlowEnabled(savedGlow);
     setMinimalLayout(savedMinimal);
     setPerformanceMode(savedPerf);
-
+    setUsername(savedUsername);
+    setAccentColor(savedAccent);
+ 
     document.documentElement.setAttribute("data-glow", savedGlow ? "true" : "false");
     document.documentElement.setAttribute("data-minimal", savedMinimal ? "true" : "false");
     document.documentElement.setAttribute("data-perf", savedPerf ? "true" : "false");
-
+    document.documentElement.setAttribute("data-accent", savedAccent);
+ 
     setMounted(true);
   }, []);
-
+ 
   // Update theme attributes globally
   useEffect(() => {
     if (!mounted) return;
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("slate-theme", theme);
   }, [theme, mounted]);
-
+ 
   const toggleTheme = useCallback(() => {
     setTheme((t) => (t === "dark" ? "light" : "dark"));
   }, []);
-
+ 
   const toggleDrawer = useCallback(() => {
     setIsDrawerOpen((open) => !open);
   }, []);
-
+ 
   const closeDrawer = useCallback(() => {
     setIsDrawerOpen(false);
   }, []);
-
+ 
   // Settings Toggles
   const toggleGlow = (val: boolean) => {
     setGlowEnabled(val);
     localStorage.setItem("slate-settings-glow", val ? "true" : "false");
     document.documentElement.setAttribute("data-glow", val ? "true" : "false");
   };
-
+ 
   const toggleMinimal = (val: boolean) => {
     setMinimalLayout(val);
     localStorage.setItem("slate-settings-minimal", val ? "true" : "false");
     document.documentElement.setAttribute("data-minimal", val ? "true" : "false");
   };
-
+ 
   const togglePerf = (val: boolean) => {
     setPerformanceMode(val);
     localStorage.setItem("slate-settings-perf", val ? "true" : "false");
     document.documentElement.setAttribute("data-perf", val ? "true" : "false");
+  };
+
+  const handleUsernameChange = (val: string) => {
+    setUsername(val);
+    localStorage.setItem("slate-username", val);
+    window.dispatchEvent(new Event("slate-username-updated"));
+  };
+
+  const handleAccentChange = (val: string) => {
+    setAccentColor(val);
+    localStorage.setItem("slate-accent", val);
+    document.documentElement.setAttribute("data-accent", val);
   };
 
   // Close on outside click
@@ -340,6 +369,66 @@ export default function ControlHub() {
                   } active:scale-x-125`}
                 />
               </button>
+            </div>
+
+            {/* Personalized Name */}
+            <div
+              style={{ animationDelay: "200ms" }}
+              className={`flex flex-col gap-2 py-2 border-b border-[var(--glass-border)]/40 ${
+                isDrawerOpen ? "animate-item-in" : "opacity-0"
+              }`}
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium sm:font-normal text-[var(--foreground)]/90 dark:text-[var(--foreground)]/70 flex items-center gap-2">
+                  <User className="w-4 h-4 text-[var(--accent)]" /> Your Name
+                </span>
+                <span className="text-[11px] text-[var(--foreground)]/65 dark:text-[var(--foreground)]/45 font-normal">
+                  Appends your name to the main greeting
+                </span>
+              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                placeholder="Enter name..."
+                maxLength={20}
+                className="w-full h-[38px] px-3.5 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)] text-sm text-[var(--foreground)] placeholder-[var(--foreground)]/30 focus:outline-none focus:border-[var(--accent)] focus:bg-[var(--foreground)]/8 transition-all duration-300"
+              />
+            </div>
+
+            {/* Accent Color Selection */}
+            <div
+              style={{ animationDelay: "250ms" }}
+              className={`flex flex-col gap-2.5 py-2 border-b border-[var(--glass-border)]/40 ${
+                isDrawerOpen ? "animate-item-in" : "opacity-0"
+              }`}
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium sm:font-normal text-[var(--foreground)]/90 dark:text-[var(--foreground)]/70 flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-[var(--accent)]" /> Accent Color
+                </span>
+                <span className="text-[11px] text-[var(--foreground)]/65 dark:text-[var(--foreground)]/45 font-normal">
+                  Choose a signature accent color preset
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 flex-wrap mt-0.5">
+                {ACCENT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => handleAccentChange(preset.id)}
+                    title={preset.name}
+                    className={`w-7 h-7 rounded-full cursor-pointer transition-all duration-300 relative flex items-center justify-center border hover:scale-110 active:scale-95
+                      ${accentColor === preset.id
+                        ? "border-[var(--foreground)] scale-105 shadow-sm"
+                        : "border-[var(--foreground)]/10"}`}
+                    style={{ backgroundColor: theme === "light" ? preset.lightColor : preset.color }}
+                  >
+                    {accentColor === preset.id && (
+                      <div className="w-2 h-2 rounded-full bg-[var(--background)]" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
           </div>

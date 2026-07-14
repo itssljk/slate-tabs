@@ -35,10 +35,24 @@ function getGreetingData(): GreetingData {
 
 export default function Greeting() {
   const [data, setData] = useState<GreetingData | null>(null);
+  const [username, setUsername] = useState<string>("");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setData(getGreetingData());
+
+    const savedUsername = localStorage.getItem("slate-username") || "";
+    setUsername(savedUsername);
+
+    const handleUsernameUpdate = () => {
+      const currentUsername = localStorage.getItem("slate-username") || "";
+      setUsername(currentUsername);
+    };
+
+    window.addEventListener("slate-username-updated", handleUsernameUpdate);
+    return () => {
+      window.removeEventListener("slate-username-updated", handleUsernameUpdate);
+    };
   }, []);
 
   if (!data) return <div className="h-[68px] sm:h-[84px] lg:h-[96px]" />; // skeleton container to prevent layout shift
@@ -48,6 +62,7 @@ export default function Greeting() {
       <div className="flex items-baseline justify-center gap-0.5 sm:gap-1">
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight greeting-gradient">
           {data.text}
+          {username ? `, ${username}` : ""}
         </h1>
         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[var(--accent)] inline-block align-middle translate-y-[-2px] sm:translate-y-[-4px]" />
       </div>
