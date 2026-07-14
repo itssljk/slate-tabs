@@ -1,34 +1,30 @@
-# Slate Tabs 🪐
+# Slate Tabs
 
-Slate Tabs is a sleek, minimalist browser new-tab/start page designed to replace the cluttered default browser homepages. Built with Next.js, React, and Tailwind CSS, it offers a premium, modern dashboard experience with smooth animations, dynamic greetings, and high customizability.
+A minimalist start page and new tab replacement for your browser. Built with Next.js, React, and Tailwind CSS.
 
-## ✨ Features
+## Features
 
-- **Ambient UI & Theme System**: Fully responsive light/dark modes with beautiful, glowing background backdrops and smooth, customized micro-animations.
-- **Dynamic Greetings**: Time-aware greetings that adapt to morning, afternoon, evening, and night.
-- **Advanced Search Hub**: A fast, interactive search bar with quick access to 9 search engines (Google, Bing, Yahoo, DuckDuckGo, Brave Search, Startpage, Ecosia, Yandex, and Baidu).
-- **Control Hub (Settings Drawer)**:
-  - Toggle light and dark themes
-  - Enable/disable ambient glow effects
-  - Switch to a performance mode for low-end hardware
-  - Toggle minimal layouts for extra distraction-free focus
+- **Ambient Theme**: Light and dark mode support with an optional subtle background glow.
+- **Dynamic Greetings**: Greeting messages that change based on the time of day.
+- **Search Integration**: A quick search bar with support for multiple search engines (Google, DuckDuckGo, Brave, etc.).
+- **Control Panel**: Toggles for theme, ambient glow, performance mode, and minimal layout.
 
-## 🛠️ Tech Stack
+## Tech Stack
 
-- **Framework**: [Next.js](https://nextjs.org/) (App Router)
-- **UI & Logic**: [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Icons**: [Lucide React](https://lucide.dev/)
+- **Framework**: Next.js (App Router)
+- **UI & Logic**: React, TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and npm/yarn/pnpm
+- Node.js 18+
 
-### Installation
+### Running Locally
 
-1. Clone the repository:
+1. Clone the repository and navigate into it:
    ```bash
    git clone https://github.com/yourusername/slate-tabs.git
    cd slate-tabs
@@ -39,14 +35,14 @@ Slate Tabs is a sleek, minimalist browser new-tab/start page designed to replace
    npm install
    ```
 
-3. Run the development server:
+3. Start the local development server:
    ```bash
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to view the page.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📄 License
+## License
 
 This project is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)](./LICENSE) License.
 
