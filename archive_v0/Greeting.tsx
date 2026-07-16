@@ -66,7 +66,7 @@ export default function Greeting() {
         </h1>
         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[var(--accent)] inline-block align-middle translate-y-[-2px] sm:translate-y-[-4px]" />
       </div>
-      <p className="mt-3 text-xs sm:text-sm tracking-[0.2em] font-light text-[var(--foreground)]/50 uppercase">
+      <p className="mt-3 text-xs sm:text-sm tracking-[0.2em] font-light text-[var(--foreground)]/50 uppercase text-readable">
         {data.subtext}
       </p>
     </div>
