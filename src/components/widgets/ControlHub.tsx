@@ -774,6 +774,7 @@ export default function ControlHub() {
   // Reset drawer state and scroll positions when opened
   useEffect(() => {
     if (isDrawerOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActivePane("main");
       
       const resetScroll = () => {
@@ -1452,7 +1453,7 @@ export default function ControlHub() {
 
             {/* Footer */}
             <div className="text-center text-[10px] tracking-widest text-[var(--foreground)]/48 dark:text-[var(--foreground)]/30 uppercase font-medium pt-6 border-t border-[var(--glass-border)]/40 mb-2">
-              Slate Tabs v0.1.0
+              Slate Tabs v1.0.0
             </div>
           </div>
 
@@ -1776,7 +1777,7 @@ export default function ControlHub() {
 
             {/* Footer */}
             <div className="text-center text-[10px] tracking-widest text-[var(--foreground)]/48 dark:text-[var(--foreground)]/30 uppercase font-medium pt-6 border-t border-[var(--glass-border)]/40 mb-2">
-              Slate Tabs v0.1.0
+              Slate Tabs v1.0.0
             </div>
           </div>
 
