@@ -175,7 +175,7 @@ export default function WeatherWidget() {
 
   return (
     <div className="fixed top-0 left-0 z-40 p-6 sm:p-12 select-none pointer-events-none">
-      <div className="animate-fade-in-up flex items-center gap-1.5 text-[var(--foreground)]/50 text-[13px] font-light tracking-wide">
+      <div className="animate-fade-in-up flex items-center gap-1.5 text-[var(--foreground)]/50 text-[13px] font-light tracking-wide weather-text">
         <WeatherIcon code={weather.current.weatherCode} className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
         <span className="tabular-nums">
           {displayTemp}°{tempUnit === "fahrenheit" ? "F" : "C"}
@@ -184,7 +184,7 @@ export default function WeatherWidget() {
           {getDescription(weather.current.weatherCode)}
         </span>
         {weather.location && (
-          <span className="hidden md:inline text-[var(--foreground)]/30">
+          <span className="hidden md:inline text-[var(--foreground)]/30 weather-location">
             &middot; {weather.location}
           </span>
         )}

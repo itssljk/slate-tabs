@@ -661,7 +661,9 @@ export default function SearchBar() {
       {/* Mode Switcher Tabs */}
       {isMounted && servicesEnabled && (
         <div 
-          className="flex justify-center transition-all duration-300"
+          className={`flex justify-center transition-all duration-300 ${
+            entered ? "blur-[4px] opacity-40 scale-[0.98] pointer-events-none" : ""
+          }`}
           style={{ zIndex: showOrbit ? 50 : 10 }}
         >
           <div className="inline-flex p-0.5 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] backdrop-blur-md relative select-none">
@@ -759,13 +761,16 @@ export default function SearchBar() {
             }}
             placeholder={!isMounted ? "Search..." : `Search ${activeEngine.name}...`}
             className={`w-full h-[52px] pl-12 pr-12 rounded-full glass-input text-[var(--foreground)] text-base sm:text-sm placeholder-[var(--foreground)]/50 tracking-wide focus:outline-none transition-all duration-300
-              ${activeMode === "services" ? "glass-input-services" : ""}`}
+              ${activeMode === "services" ? "glass-input-services" : ""}
+              ${entered ? "blur-[4px] opacity-40 scale-[0.98] pointer-events-none" : ""}`}
             autoComplete="off"
             spellCheck="false"
           />
 
           {!query && (
-            <kbd className="hidden sm:inline-block absolute right-4 px-1.5 py-0.5 rounded border border-[var(--foreground)]/25 text-[10px] text-[var(--foreground)]/40 pointer-events-none group-focus-within:opacity-0 transition-opacity duration-200 uppercase font-sans">
+            <kbd className={`hidden sm:inline-block absolute right-4 px-1.5 py-0.5 rounded border border-[var(--foreground)]/25 text-[10px] text-[var(--foreground)]/40 pointer-events-none group-focus-within:opacity-0 transition-all duration-300 uppercase font-sans ${
+              entered ? "blur-[4px] opacity-40 scale-[0.98]" : ""
+            }`}>
               {shortcutLabel}
             </kbd>
           )}
@@ -775,7 +780,7 @@ export default function SearchBar() {
             onClick={handleClear}
             className={`absolute right-4 p-1 rounded-full text-[var(--foreground)]/50 hover:text-[var(--foreground)]/80 hover:bg-[var(--foreground)]/5 cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
               query ? "opacity-100 scale-100 pointer-events-auto" : "opacity-0 scale-75 pointer-events-none"
-            }`}
+            } ${entered ? "blur-[4px] opacity-40 scale-[0.98]" : ""}`}
           >
             <X className="w-3.5 h-3.5" />
           </button>

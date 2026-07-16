@@ -8,6 +8,7 @@
   --accent: #7ca38e;
   --accent-glow: rgba(124, 163, 142, 0.15);
   --glass-bg: rgba(10, 11, 22, 0.45);
+  --glass-bg-dropdown: rgba(10, 11, 22, 0.75);
   --glass-border: rgba(255, 255, 255, 0.06);
   --glass-border-focus: rgba(124, 163, 142, 0.4);
 
@@ -25,6 +26,7 @@
   --accent: #A35C36;
   --accent-glow: rgba(163, 92, 54, 0.12);
   --glass-bg: rgba(255, 254, 252, 0.82);
+  --glass-bg-dropdown: rgba(255, 254, 252, 0.92);
   --glass-border: rgba(44, 37, 32, 0.12);
   --glass-border-focus: rgba(163, 92, 54, 0.35);
 
@@ -83,6 +85,17 @@ body::after {
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    var(--glass-inset-shadow),
+    var(--glass-shadow);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-dropdown {
+  background: var(--glass-bg-dropdown);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--glass-border);
   box-shadow:
     var(--glass-inset-shadow),
@@ -263,6 +276,32 @@ body::after {
   margin-bottom: -0.15em;
 }
 
+/* Visibility enhancements when a wallpaper is active */
+html[data-bg-custom="true"] .greeting-gradient {
+  font-weight: 600;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
+}
+
+html[data-bg-custom="true"] .text-readable {
+  font-weight: 500;
+  color: var(--foreground);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+html[data-bg-custom="true"] .weather-text {
+  font-weight: 500;
+  color: var(--foreground);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+html[data-bg-custom="true"] .weather-text svg {
+  stroke-width: 2 !important;
+}
+
+html[data-bg-custom="true"] .weather-location {
+  color: color-mix(in srgb, var(--foreground) 70%, transparent) !important;
+}
+
 /* Staggered entrance for menu and settings items */
 @keyframes item-slide-in {
   from {
@@ -329,10 +368,12 @@ body::after {
 /* Low Motion / Performance Mode Override */
 [data-perf="true"] {
   --glass-bg: #0e1020 !important;
+  --glass-bg-dropdown: #0e1020 !important;
 }
 
 [data-theme="light"][data-perf="true"] {
   --glass-bg: #f8f5ee !important;
+  --glass-bg-dropdown: #f8f5ee !important;
 }
 
 [data-perf="true"] * {
@@ -431,3 +472,123 @@ body::after {
   --accent-glow: rgba(71, 85, 105, 0.15);
   --glass-border-focus: rgba(71, 85, 105, 0.35);
 }
+
+/* Custom (User Defined) */
+:root[data-accent="custom"], [data-theme="dark"][data-accent="custom"] {
+  --accent: var(--custom-accent);
+  --accent-glow: color-mix(in srgb, var(--custom-accent) 15%, transparent);
+  --glass-border-focus: color-mix(in srgb, var(--custom-accent) 40%, transparent);
+}
+[data-theme="light"][data-accent="custom"] {
+  --accent: var(--custom-accent-light);
+  --accent-glow: color-mix(in srgb, var(--custom-accent-light) 12%, transparent);
+  --glass-border-focus: color-mix(in srgb, var(--custom-accent-light) 35%, transparent);
+}
+
+/* ════════════════════════════════════════════
+   CUSTOM SCROLLBARS
+   ════════════════════════════════════════════ */
+
+/* Global Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 100px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--accent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Firefox Global Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 20%, transparent) transparent;
+}
+
+/* Custom Scrollbar Utility */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 100px;
+}
+
+[data-theme="dark"] .custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 100px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 30%, transparent) rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .custom-scrollbar {
+  scrollbar-color: color-mix(in srgb, var(--accent) 30%, transparent) rgba(255, 255, 255, 0.015);
+}
+
+/* Thin Scrollbar Utility */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 100px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 20%, transparent) transparent;
+}
+
+/* Hide Scrollbar Utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+
