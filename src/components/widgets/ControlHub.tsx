@@ -1,247 +1,14 @@
 "use client";
- 
+
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { X, Shield, Eye, Cpu, User, Palette, Image as ImageIcon, Upload, Link as LinkIcon, ChevronLeft, Sparkles, Trash2, Loader2, SlidersHorizontal, CloudSun, LayoutGrid, Thermometer, Mail } from "lucide-react";
 import { saveBackgroundBlob, clearBackgroundBlob, getBackgroundBlob, DEFAULT_BG_SETTINGS } from "@/utils/backgroundDb";
- 
+import { ACCENT_PRESETS, getLightAccentColor, hexToHsl, hslToHex } from "@/utils/accent";
+import { CURATED_BACKGROUNDS } from "@/utils/backgrounds";
+import { siteConfig } from "@/config/site";
+
 type Theme = "dark" | "light";
-
-const ACCENT_PRESETS = [
-  { id: "sage", name: "Sage", color: "#7ca38e", lightColor: "#4B6F58" },
-  { id: "emerald", name: "Emerald", color: "#10B981", lightColor: "#0A8057" },
-  { id: "violet", name: "Violet", color: "#A78BFA", lightColor: "#6C3FE6" },
-  { id: "amber", name: "Amber", color: "#FBBF24", lightColor: "#B25E00" },
-  { id: "rose", name: "Rose", color: "#FB7185", lightColor: "#C82B54" },
-  { id: "cyan", name: "Cyan", color: "#22D3EE", lightColor: "#067A92" },
-  { id: "slate", name: "Slate", color: "#94A3B8", lightColor: "#50617A" }
-];
-
-function getLightAccentColor(hex: string): string {
-  let r = 0, g = 0, b = 0;
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex.slice(1, 3), 16);
-    g = parseInt(hex.slice(3, 5), 16);
-    b = parseInt(hex.slice(5, 7), 16);
-  } else {
-    return hex;
-  }
-
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-
-  h = Math.round(h * 360);
-  s = Math.round(s * 100);
-  l = Math.round(l * 100);
-
-  const adjustedL = Math.max(25, Math.min(l - 22, 50));
-
-  const sRatio = s / 100;
-  const lRatio = adjustedL / 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = sRatio * Math.min(lRatio, 1 - lRatio);
-  const f = (n: number) => {
-    const k_n = k(n);
-    const color = lRatio - a * Math.max(Math.min(k_n - 3, 9 - k_n, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
-function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  let r = 0, g = 0, b = 0;
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex.slice(1, 3), 16);
-    g = parseInt(hex.slice(3, 5), 16);
-    b = parseInt(hex.slice(5, 7), 16);
-  } else {
-    return { h: 0, s: 0, l: 0 };
-  }
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  let h = 0, s = 0;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-  return {
-    h: Math.round(h * 360),
-    s: Math.round(s * 100),
-    l: Math.round(l * 100)
-  };
-}
-
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k_n = k(n);
-    const color = l - a * Math.max(Math.min(k_n - 3, 9 - k_n, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
-const CURATED_BACKGROUNDS = [
-  {
-    id: "mountains",
-    name: "Foggy Mountains",
-    url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=240&q=80",
-    photographer: "Eberhard Grossgasteiger",
-    profileUrl: "https://unsplash.com/@eberhardg"
-  },
-  {
-    id: "forest",
-    name: "Forest Pathway",
-    url: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?auto=format&fit=crop&w=240&q=80",
-    photographer: "Dave Hoefler",
-    profileUrl: "https://unsplash.com/@davehoefler"
-  },
-  {
-    id: "space",
-    name: "Cosmic Nebula",
-    url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=240&q=80",
-    photographer: "Alexander Andrews",
-    profileUrl: "https://unsplash.com/@alexanderandrews"
-  },
-  {
-    id: "desert",
-    name: "Sand Dunes",
-    url: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=240&q=80",
-    photographer: "Keith Ladzinski",
-    profileUrl: "https://unsplash.com/@keithladzinski"
-  },
-  {
-    id: "stars",
-    name: "Starry Night",
-    url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=240&q=80",
-    photographer: "Vincentiu Solomon",
-    profileUrl: "https://unsplash.com/@vincentiusolomon"
-  },
-  {
-    id: "abstract",
-    name: "Abstract Waves",
-    url: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=240&q=80",
-    photographer: "Pawel Czerwinski",
-    profileUrl: "https://unsplash.com/@pawel_czerwinski"
-  },
-  {
-    id: "beach",
-    name: "Beach Sunset",
-    url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=240&q=80",
-    photographer: "Sean Oulashin",
-    profileUrl: "https://unsplash.com/@seanoulashin"
-  },
-  {
-    id: "branches",
-    name: "Minimalist Leaves",
-    url: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=240&q=80",
-    photographer: "Sarah Dorweiler",
-    profileUrl: "https://unsplash.com/@sarahdorweiler"
-  },
-  {
-    id: "cyberpunk",
-    name: "Cyberpunk City",
-    url: "https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=240&q=80",
-    photographer: "Sean Foley",
-    profileUrl: "https://unsplash.com/@seanfoley"
-  },
-  {
-    id: "mistypines",
-    name: "Misty Pine Forest",
-    url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=240&q=80",
-    photographer: "Kalen Emsley",
-    profileUrl: "https://unsplash.com/@kalenemsley"
-  },
-  {
-    id: "goldengate",
-    name: "Golden Gate Bridge",
-    url: "https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1506012787146-f92b2d7d6d96?auto=format&fit=crop&w=240&q=80",
-    photographer: "Sohail Naeem",
-    profileUrl: "https://unsplash.com/@sohail_naeem"
-  },
-  {
-    id: "milkyway",
-    name: "Milky Way Galaxy",
-    url: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=240&q=80",
-    photographer: "Denis Degioanni",
-    profileUrl: "https://unsplash.com/@denisdegioanni"
-  },
-  {
-    id: "neonstreet",
-    name: "Neon Street",
-    url: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=240&q=80",
-    photographer: "Jezael Melgoza",
-    profileUrl: "https://unsplash.com/@jezael"
-  },
-  {
-    id: "benjaminvoros",
-    name: "Minimalist Mountains",
-    url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=240&q=80",
-    photographer: "Benjamin Voros",
-    profileUrl: "https://unsplash.com/@vorosbenis711"
-  },
-  {
-    id: "fuji",
-    name: "Fuji Mountain",
-    url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=240&q=80",
-    photographer: "Sora Sagano",
-    profileUrl: "https://unsplash.com/@sorasagano"
-  },
-  {
-    id: "oceanwaves",
-    name: "Ocean Waves",
-    url: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=1200&q=80",
-    thumbnail: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=240&q=80",
-    photographer: "Ishaku Baba",
-    profileUrl: "https://unsplash.com/@ishakubaba"
-  }
-];
  
 function getInitialTheme(): Theme {
   if (typeof window !== "undefined") {
@@ -1453,7 +1220,7 @@ export default function ControlHub() {
 
             {/* Footer */}
             <div className="text-center text-[10px] tracking-widest text-[var(--foreground)]/48 dark:text-[var(--foreground)]/30 uppercase font-medium pt-6 border-t border-[var(--glass-border)]/40 mb-2">
-              Slate Tabs v1.0.0
+              Slate Tabs v{siteConfig.version}
             </div>
           </div>
 
@@ -1777,7 +1544,7 @@ export default function ControlHub() {
 
             {/* Footer */}
             <div className="text-center text-[10px] tracking-widest text-[var(--foreground)]/48 dark:text-[var(--foreground)]/30 uppercase font-medium pt-6 border-t border-[var(--glass-border)]/40 mb-2">
-              Slate Tabs v1.0.0
+              Slate Tabs v{siteConfig.version}
             </div>
           </div>
 

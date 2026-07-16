@@ -29,8 +29,8 @@ export async function saveBackgroundBlob(blob: Blob): Promise<void> {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.put(blob, "custom-upload");
     
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db.close(); resolve(); };
+    request.onerror = () => { db.close(); reject(request.error); };
   });
 }
 
@@ -42,8 +42,8 @@ export async function getBackgroundBlob(): Promise<Blob | null> {
       const store = transaction.objectStore(STORE_NAME);
       const request = store.get("custom-upload");
       
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { db.close(); resolve(request.result || null); };
+      request.onerror = () => { db.close(); reject(request.error); };
     });
   } catch (error) {
     console.error("Failed to load background from IndexedDB:", error);
@@ -58,8 +58,8 @@ export async function clearBackgroundBlob(): Promise<void> {
     const store = transaction.objectStore(STORE_NAME);
     const request = store.delete("custom-upload");
     
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { db.close(); resolve(); };
+    request.onerror = () => { db.close(); reject(request.error); };
   });
 }
 

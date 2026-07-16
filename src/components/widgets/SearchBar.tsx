@@ -173,7 +173,6 @@ export default function SearchBar() {
   const [selectedWebId, setSelectedWebId] = useState("google");
   const [selectedServiceId, setSelectedServiceId] = useState("youtube");
   const [faviconError, setFaviconError] = useState(false);
-  const [engineVersion, setEngineVersion] = useState(0);
 
   const [phase, setPhase] = useState<"closed" | "open" | "closing">("closed");
   const [entered, setEntered] = useState(false);
@@ -331,7 +330,7 @@ export default function SearchBar() {
     return () => {
       if (suggestTimer.current) clearTimeout(suggestTimer.current);
     };
-  }, [query, activeEngine, activeMode, isMounted]);
+  }, [query, activeEngine, activeMode, isMounted, servicesEnabled]);
 
   const selectSuggestion = (text: string) => {
     setQuery(text);
@@ -471,7 +470,8 @@ export default function SearchBar() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (phaseRef.current === "open") {
-          closePicker();
+          if (closingTimer.current) clearTimeout(closingTimer.current);
+          setPhase("closing");
           return;
         }
         if (showSuggestionsRef.current) {
@@ -517,10 +517,11 @@ export default function SearchBar() {
       const isInsideDrawer = drawerRef.current && drawerRef.current.contains(target);
 
       if (!isInsideContainer && !isInsideDrawer) {
-        if (phase === "open") {
-          closePicker();
+        if (phaseRef.current === "open") {
+          if (closingTimer.current) clearTimeout(closingTimer.current);
+          setPhase("closing");
         }
-        if (showSuggestions) {
+        if (showSuggestionsRef.current) {
           setShowSuggestions(false);
           setActiveIndex(-1);
         }
@@ -531,7 +532,6 @@ export default function SearchBar() {
     document.addEventListener("mousedown", handleClickOutside);
 
     const handleEngineUpdate = () => {
-      setEngineVersion((v) => v + 1);
       const engineId = localStorage.getItem("slate-search-engine-id");
       const engines = getEngines();
       if (engineId && engines.some((e) => e.id === engineId)) {
@@ -553,7 +553,6 @@ export default function SearchBar() {
     window.addEventListener("slate-services-settings-updated", handleServicesSettingsUpdate);
 
     const handleServicesUpdate = () => {
-      setEngineVersion((v) => v + 1);
       const serviceId = localStorage.getItem("slate-search-service-id");
       const services = getServices();
       if (serviceId && services.some((s) => s.id === serviceId)) {
@@ -572,7 +571,7 @@ export default function SearchBar() {
       window.removeEventListener("slate-services-updated", handleServicesUpdate);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;

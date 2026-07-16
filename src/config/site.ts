@@ -1,5 +1,6 @@
 export const siteConfig = {
   name: "Slate Tabs",
+  version: "1.0.0",
   description: "A clean, minimal, and dark-themed browser start page.",
   url: "https://github.com/itssljk/slate-tabs",
   links: {
@@ -9,11 +10,6 @@ export const siteConfig = {
     {
       title: "Home",
       href: "/",
-    },
-    {
-      title: "Dashboard",
-      href: "/dashboard",
-      disabled: true,
     },
     {
       title: "Settings",

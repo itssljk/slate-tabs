@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Cloud,
   CloudDrizzle,
@@ -98,6 +98,11 @@ export default function WeatherWidget() {
     return (localStorage.getItem("slate-temp-unit") || "celsius") as "celsius" | "fahrenheit";
   });
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const weatherRef = useRef<WeatherData | null>(null);
+
+  useEffect(() => {
+    weatherRef.current = weather;
+  }, [weather]);
 
   const loadWeather = useCallback(async () => {
     try {
@@ -145,7 +150,7 @@ export default function WeatherWidget() {
     const handleUpdate = () => {
       const newEnabled = localStorage.getItem("slate-settings-weather") !== "false";
       setEnabled(newEnabled);
-      if (newEnabled && !weather) loadWeather();
+      if (newEnabled && !weatherRef.current) loadWeather();
     };
 
     const handleTempUnitUpdate = () => {
@@ -158,7 +163,7 @@ export default function WeatherWidget() {
       window.removeEventListener("slate-weather-updated", handleUpdate);
       window.removeEventListener("slate-temp-unit-updated", handleTempUnitUpdate);
     };
-  }, [loadWeather, weather]);
+  }, [loadWeather]);
 
   if (!loaded) return null;
   if (!enabled) return null;

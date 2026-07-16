@@ -281,6 +281,21 @@ body::after {
   animation: item-slide-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes suggest-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-suggest-in {
+  animation: suggest-in 0.25s ease-out both;
+}
+
 /* Settings Controls via HTML dataset attributes */
 [data-minimal="true"] footer {
   opacity: 0;
