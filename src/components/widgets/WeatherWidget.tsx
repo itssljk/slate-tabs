@@ -117,6 +117,7 @@ export default function WeatherWidget() {
       });
 
       const { latitude, longitude } = position.coords;
+      localStorage.setItem("slate-weather-location-granted", "true");
       const params = new URLSearchParams({
         latitude: latitude.toString(),
         longitude: longitude.toString(),
@@ -136,16 +137,50 @@ export default function WeatherWidget() {
         },
         location,
       });
-    } catch {
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === 1) {
+        localStorage.setItem("slate-weather-location-granted", "false");
+      }
       // silently fail — weather is non-essential
     }
   }, []);
 
   useEffect(() => {
-    const savedEnabled = localStorage.getItem("slate-settings-weather") !== "false";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (savedEnabled) loadWeather();
-    setLoaded(true);
+    const initWeather = async () => {
+      const savedEnabled = localStorage.getItem("slate-settings-weather") !== "false";
+      if (!savedEnabled) {
+        setLoaded(true);
+        return;
+      }
+
+      let shouldLoad = false;
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          if (status.state === "granted") {
+            shouldLoad = true;
+          }
+          status.onchange = () => {
+            if (status.state === "granted") {
+              loadWeather();
+            } else if (status.state === "denied") {
+              setWeather(null);
+            }
+          };
+        } else {
+          shouldLoad = localStorage.getItem("slate-weather-location-granted") === "true";
+        }
+      } catch {
+        shouldLoad = localStorage.getItem("slate-weather-location-granted") === "true";
+      }
+
+      if (shouldLoad) {
+        await loadWeather();
+      }
+      setLoaded(true);
+    };
+
+    initWeather();
 
     const handleUpdate = () => {
       const newEnabled = localStorage.getItem("slate-settings-weather") !== "false";
@@ -167,7 +202,21 @@ export default function WeatherWidget() {
 
   if (!loaded) return null;
   if (!enabled) return null;
-  if (!weather) return null;
+
+  if (!weather) {
+    return (
+      <div className="fixed top-0 left-0 z-40 p-6 sm:p-12 select-none pointer-events-none">
+        <button
+          onClick={loadWeather}
+          className="animate-fade-in-up flex items-center gap-1.5 text-[var(--foreground)]/40 hover:text-[var(--foreground)]/70 text-[13px] font-light tracking-wide weather-text pointer-events-auto transition-colors duration-200 cursor-pointer"
+          title="Click to show weather (requires location)"
+        >
+          <CloudSun className="w-3.5 h-3.5 shrink-0 animate-pulse" strokeWidth={1.5} />
+          <span>Show Weather</span>
+        </button>
+      </div>
+    );
+  }
 
   const displayTemp = tempUnit === "fahrenheit"
     ? Math.round((weather.current.temperature * 9) / 5 + 32)

@@ -7,6 +7,7 @@ import { saveBackgroundBlob, clearBackgroundBlob, getBackgroundBlob, DEFAULT_BG_
 import { ACCENT_PRESETS, getLightAccentColor, hexToHsl, hslToHex } from "@/utils/accent";
 import { CURATED_BACKGROUNDS } from "@/utils/backgrounds";
 import { siteConfig } from "@/config/site";
+import { getSettingsUrl } from "@/utils/navigation";
 
 type Theme = "dark" | "light";
  
@@ -569,6 +570,11 @@ export default function ControlHub() {
   }
 
   const isDark = theme === "dark";
+  const isCustomBgActive = bgType !== "default" && (
+    (bgType === "curated" && bgCuratedUrl) ||
+    (bgType === "url" && bgUrlLink) ||
+    (bgType === "upload" && uploadPreview)
+  );
 
   return (
     <div ref={containerRef} className="fixed top-6 right-6 sm:top-12 sm:right-12 z-50 flex flex-col items-end">
@@ -595,70 +601,74 @@ export default function ControlHub() {
           </>
         )}
 
-        {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          className="group relative p-2.5 rounded-full text-[var(--foreground)]/40 hover:text-[var(--foreground)]/80 hover:bg-[var(--foreground)]/5 hover:scale-105 active:scale-95 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] cursor-pointer"
-          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          <div className="relative w-5 h-5 flex items-center justify-center">
-            <svg
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              stroke="currentColor"
-              strokeWidth="2.25"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`transition-transform duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                isDark ? "rotate-[40deg]" : "rotate-[90deg]"
-              }`}
+        {!isCustomBgActive && (
+          <>
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="group relative p-2.5 rounded-full text-[var(--foreground)]/40 hover:text-[var(--foreground)]/80 hover:bg-[var(--foreground)]/5 hover:scale-105 active:scale-95 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] cursor-pointer"
+              title={isDark ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {/* Mask to cut out the crescent shape */}
-              <mask id="moon-mask">
-                <rect x="0" y="0" width="100%" height="100%" fill="white" />
-                <circle
-                  cx={isDark ? "18" : "30"}
-                  cy={isDark ? "6" : "0"}
-                  r="8"
-                  fill="black"
-                  className="transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-                />
-              </mask>
-              
-              {/* Main circle (Sun core / Moon body) */}
-              <circle
-                cx="12"
-                cy="12"
-                r={isDark ? "8" : "5"}
-                fill="currentColor"
-                mask="url(#moon-mask)"
-                className="transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-              />
-              
-              {/* Solar rays */}
-              <g
-                className={`transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                  isDark ? "opacity-0 scale-50 rotate-45" : "opacity-100 scale-100 rotate-0"
-                }`}
-                style={{ transformOrigin: "center" }}
-              >
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </g>
-            </svg>
-          </div>
-        </button>
+              <div className="relative w-5 h-5 flex items-center justify-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  stroke="currentColor"
+                  strokeWidth="2.25"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`transition-transform duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                    isDark ? "rotate-[40deg]" : "rotate-[90deg]"
+                  }`}
+                >
+                  {/* Mask to cut out the crescent shape */}
+                  <mask id="moon-mask">
+                    <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                    <circle
+                      cx={isDark ? "18" : "30"}
+                      cy={isDark ? "6" : "0"}
+                      r="8"
+                      fill="black"
+                      className="transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                    />
+                  </mask>
+                  
+                  {/* Main circle (Sun core / Moon body) */}
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r={isDark ? "8" : "5"}
+                    fill="currentColor"
+                    mask="url(#moon-mask)"
+                    className="transition-all duration-600 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                  />
+                  
+                  {/* Solar rays */}
+                  <g
+                    className={`transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                      isDark ? "opacity-0 scale-50 rotate-45" : "opacity-100 scale-100 rotate-0"
+                    }`}
+                    style={{ transformOrigin: "center" }}
+                  >
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </g>
+                </svg>
+              </div>
+            </button>
 
-        {/* Hairline Divider */}
-        <div className="w-[1px] h-4.5 bg-[var(--foreground)]/10" />
+            {/* Hairline Divider */}
+            <div className="w-[1px] h-4.5 bg-[var(--foreground)]/10" />
+          </>
+        )}
 
         {/* Hamburger Menu Toggle Button */}
         <button
@@ -1196,7 +1206,7 @@ export default function ControlHub() {
 
                 {/* Detailed Settings Page Row */}
                 <Link
-                  href="/settings"
+                  href={getSettingsUrl()}
                   style={{ animationDelay: "350ms" }}
                   className={`flex items-center justify-between py-2 border-b border-[var(--glass-border)]/40 cursor-pointer hover:bg-[var(--foreground)]/3 px-2 -mx-2 rounded-lg transition-colors ${
                     isDrawerOpen ? "animate-item-in" : "opacity-0"

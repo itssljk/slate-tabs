@@ -43,6 +43,10 @@ const SERVICES_PRESETS = [
 
 
 type Tab = "general" | "appearance" | "background" | "search" | "quicklinks";
+
+function generateUniqueId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
  
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
@@ -240,8 +244,8 @@ export default function SettingsPage() {
 
   // Services Mode (Special Mode) States
   const [servicesEnabled, setServicesEnabled] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("slate-settings-services-enabled") !== "false";
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("slate-settings-services-enabled") === "true";
   });
 
   const [customServices, setCustomServices] = useState<CustomEngine[]>(() => {
@@ -772,7 +776,7 @@ export default function SettingsPage() {
     } else {
       if (customEngines.length >= CUSTOM_ENGINE_MAX) return;
       const newEngine: CustomEngine = {
-        id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: generateUniqueId("custom"),
         name: customEngineNameInput.trim(),
         url: formattedUrl,
         domain,
@@ -875,7 +879,7 @@ export default function SettingsPage() {
     } else {
       if (customServices.length >= CUSTOM_ENGINE_MAX) return;
       const newService: CustomEngine = {
-        id: `custom-service-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: generateUniqueId("custom-service"),
         name: customServiceNameInput.trim(),
         url: formattedUrl,
         domain,

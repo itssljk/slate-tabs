@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Search, X, SlidersHorizontal, Globe, Layers, Check, Settings } from "lucide-react";
+import { getSettingsUrl } from "@/utils/navigation";
 
 interface SearchEngine {
   id: string;
@@ -196,7 +197,7 @@ export default function SearchBar() {
   const [query, setQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [activeMode, setActiveMode] = useState<"web" | "services">("web");
-  const [servicesEnabled, setServicesEnabled] = useState(true);
+  const [servicesEnabled, setServicesEnabled] = useState(false);
   const [selectedWebId, setSelectedWebId] = useState("google");
   const [selectedServiceId, setSelectedServiceId] = useState("youtube");
   const [faviconError, setFaviconError] = useState(false);
@@ -367,7 +368,7 @@ export default function SearchBar() {
     if (text.startsWith("/")) {
       const cmd = text.toLowerCase().trim();
       if (cmd === "/settings") {
-        window.location.href = "/settings";
+        window.location.href = getSettingsUrl();
         return;
       }
       if (cmd === "/mode" && servicesEnabled) {
@@ -467,7 +468,7 @@ export default function SearchBar() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
-    const savedEnabled = localStorage.getItem("slate-settings-services-enabled") !== "false";
+    const savedEnabled = localStorage.getItem("slate-settings-services-enabled") === "true";
     setServicesEnabled(savedEnabled);
     const savedMode = localStorage.getItem("slate-search-mode");
     if (savedEnabled && (savedMode === "web" || savedMode === "services")) {
@@ -570,7 +571,7 @@ export default function SearchBar() {
     window.addEventListener("slate-search-engine-updated", handleEngineUpdate);
 
     const handleServicesSettingsUpdate = () => {
-      const val = localStorage.getItem("slate-settings-services-enabled") !== "false";
+      const val = localStorage.getItem("slate-settings-services-enabled") === "true";
       setServicesEnabled(val);
       if (!val) {
         setActiveMode("web");
@@ -629,7 +630,7 @@ export default function SearchBar() {
         closePicker();
         setShowSuggestions(false);
         setActiveIndex(-1);
-        window.location.href = "/settings";
+        window.location.href = getSettingsUrl();
         return;
       }
       if (cmd === "/mode" && servicesEnabled) {
@@ -1016,7 +1017,7 @@ export default function SearchBar() {
                 type="button"
                 onClick={() => {
                   closePicker();
-                  window.location.href = "/settings";
+                  window.location.href = getSettingsUrl();
                 }}
                 className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border border-dashed border-[var(--glass-border)]/80 text-[var(--foreground)]/50 hover:bg-[var(--foreground)]/[0.03] hover:text-[var(--foreground)]/80 transition-all duration-300 cursor-pointer active:scale-95 text-center min-h-[92px]"
                 style={{
