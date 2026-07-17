@@ -12,6 +12,7 @@ interface SearchEngine {
   suggestUrl?: string;
   parseSuggestions?: (data: unknown) => string[];
   jsonpCallbackParam?: string;
+  defaultEnabled?: boolean;
 }
 
 function parseGoogleSuggest(data: unknown): string[] {
@@ -93,11 +94,20 @@ function getEngines(): SearchEngine[] {
   const all = [...ENGINES, ...loadCustomEngines()];
   if (typeof window === "undefined") return all;
   try {
-    const saved = localStorage.getItem("slate-disabled-engines");
-    if (!saved) return all;
-    const disabledIds = JSON.parse(saved);
-    if (!Array.isArray(disabledIds)) return all;
-    const filtered = all.filter((e) => !disabledIds.includes(e.id));
+    let deletedIds: string[] = [];
+    const saved = localStorage.getItem("slate-deleted-engines");
+    if (saved) {
+      deletedIds = JSON.parse(saved);
+    } else {
+      const oldDisabled = localStorage.getItem("slate-disabled-engines");
+      if (oldDisabled) {
+        deletedIds = JSON.parse(oldDisabled);
+        localStorage.setItem("slate-deleted-engines", JSON.stringify(deletedIds));
+        localStorage.removeItem("slate-disabled-engines");
+      }
+    }
+    if (!Array.isArray(deletedIds)) return all;
+    const filtered = all.filter((e) => !deletedIds.includes(e.id));
     return filtered.length > 0 ? filtered : [ENGINES[0]];
   } catch {
     return all;
@@ -126,11 +136,22 @@ function getServices(): SearchEngine[] {
   const all = [...SERVICES, ...loadCustomServices()];
   if (typeof window === "undefined") return all;
   try {
-    const saved = localStorage.getItem("slate-disabled-services");
-    if (!saved) return all;
-    const disabledIds = JSON.parse(saved);
-    if (!Array.isArray(disabledIds)) return all;
-    const filtered = all.filter((e) => !disabledIds.includes(e.id));
+    let deletedIds: string[] = [];
+    const saved = localStorage.getItem("slate-deleted-services");
+    if (saved) {
+      deletedIds = JSON.parse(saved);
+    } else {
+      const oldDisabled = localStorage.getItem("slate-disabled-services");
+      if (oldDisabled) {
+        deletedIds = JSON.parse(oldDisabled);
+        localStorage.setItem("slate-deleted-services", JSON.stringify(deletedIds));
+        localStorage.removeItem("slate-disabled-services");
+      } else {
+        deletedIds = SERVICES.filter((p) => !p.defaultEnabled).map((p) => p.id);
+      }
+    }
+    if (!Array.isArray(deletedIds)) return all;
+    const filtered = all.filter((e) => !deletedIds.includes(e.id));
     return filtered.length > 0 ? filtered : [SERVICES[0]];
   } catch {
     return all;
@@ -145,7 +166,8 @@ const SERVICES: SearchEngine[] = [
     domain: "youtube.com",
     suggestUrl: "https://suggestqueries.google.com/complete/search?client=chrome&ds=yt&q=",
     parseSuggestions: parseGoogleSuggest,
-    jsonpCallbackParam: "&callback="
+    jsonpCallbackParam: "&callback=",
+    defaultEnabled: true
   },
   {
     id: "wikipedia",
@@ -154,12 +176,17 @@ const SERVICES: SearchEngine[] = [
     domain: "wikipedia.org",
     suggestUrl: "https://en.wikipedia.org/w/api.php?action=opensearch&format=json&search=",
     parseSuggestions: parseGoogleSuggest,
-    jsonpCallbackParam: "&callback="
+    jsonpCallbackParam: "&callback=",
+    defaultEnabled: true
   },
-  { id: "github", name: "GitHub", url: "https://github.com/search?q=%s", domain: "github.com" },
-  { id: "reddit", name: "Reddit", url: "https://www.reddit.com/search/?q=%s", domain: "reddit.com" },
-  { id: "stackoverflow", name: "Stack Overflow", url: "https://stackoverflow.com/search?q=%s", domain: "stackoverflow.com" },
-  { id: "translate", name: "Google Translate", url: "https://translate.google.com/?sl=auto&tl=en&text=%s&op=translate", domain: "translate.google.com" }
+  { id: "github", name: "GitHub", url: "https://github.com/search?q=%s", domain: "github.com", defaultEnabled: true },
+  { id: "reddit", name: "Reddit", url: "https://www.reddit.com/search/?q=%s", domain: "reddit.com", defaultEnabled: true },
+  { id: "maps", name: "Google Maps", url: "https://www.google.com/maps/search/%s", domain: "google.com/maps", defaultEnabled: true },
+  { id: "amazon", name: "Amazon", url: "https://www.amazon.com/s?k=%s", domain: "amazon.com", defaultEnabled: true },
+  { id: "stackoverflow", name: "Stack Overflow", url: "https://stackoverflow.com/search?q=%s", domain: "stackoverflow.com", defaultEnabled: false },
+  { id: "hackernews", name: "Hacker News", url: "https://hn.algolia.com/?q=%s", domain: "news.ycombinator.com", defaultEnabled: false },
+  { id: "spotify", name: "Spotify", url: "https://open.spotify.com/search/%s", domain: "spotify.com", defaultEnabled: false },
+  { id: "x", name: "X (Twitter)", url: "https://x.com/search?q=%s", domain: "x.com", defaultEnabled: false }
 ];
 
 const FLY_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";

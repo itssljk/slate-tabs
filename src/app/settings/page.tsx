@@ -29,13 +29,18 @@ const ENGINES = [
 ];
 
 const SERVICES_PRESETS = [
-  { id: "youtube", name: "YouTube", domain: "youtube.com", url: "https://www.youtube.com/results?search_query=%s" },
-  { id: "wikipedia", name: "Wikipedia", domain: "wikipedia.org", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s" },
-  { id: "github", name: "GitHub", domain: "github.com", url: "https://github.com/search?q=%s" },
-  { id: "reddit", name: "Reddit", domain: "reddit.com", url: "https://www.reddit.com/search/?q=%s" },
-  { id: "stackoverflow", name: "Stack Overflow", domain: "stackoverflow.com", url: "https://stackoverflow.com/search?q=%s" },
-  { id: "translate", name: "Google Translate", domain: "translate.google.com", url: "https://translate.google.com/?sl=auto&tl=en&text=%s&op=translate" }
+  { id: "youtube", name: "YouTube", domain: "youtube.com", url: "https://www.youtube.com/results?search_query=%s", defaultEnabled: true },
+  { id: "wikipedia", name: "Wikipedia", domain: "wikipedia.org", url: "https://en.wikipedia.org/wiki/Special:Search?search=%s", defaultEnabled: true },
+  { id: "github", name: "GitHub", domain: "github.com", url: "https://github.com/search?q=%s", defaultEnabled: true },
+  { id: "reddit", name: "Reddit", domain: "reddit.com", url: "https://www.reddit.com/search/?q=%s", defaultEnabled: true },
+  { id: "maps", name: "Google Maps", domain: "google.com/maps", url: "https://www.google.com/maps/search/%s", defaultEnabled: true },
+  { id: "amazon", name: "Amazon", domain: "amazon.com", url: "https://www.amazon.com/s?k=%s", defaultEnabled: true },
+  { id: "stackoverflow", name: "Stack Overflow", domain: "stackoverflow.com", url: "https://stackoverflow.com/search?q=%s", defaultEnabled: false },
+  { id: "hackernews", name: "Hacker News", domain: "news.ycombinator.com", url: "https://hn.algolia.com/?q=%s", defaultEnabled: false },
+  { id: "spotify", name: "Spotify", domain: "spotify.com", url: "https://open.spotify.com/search/%s", defaultEnabled: false },
+  { id: "x", name: "X (Twitter)", domain: "x.com", url: "https://x.com/search?q=%s", defaultEnabled: false }
 ];
+
 
 type Tab = "general" | "appearance" | "background" | "search" | "quicklinks";
  
@@ -209,14 +214,20 @@ export default function SettingsPage() {
     return [];
   });
 
-  const [disabledEngineIds, setDisabledEngineIds] = useState<string[]>(() => {
+  const [deletedEngineIds, setDeletedEngineIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const saved = localStorage.getItem("slate-disabled-engines");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      const saved = localStorage.getItem("slate-deleted-engines");
+      if (saved) return JSON.parse(saved);
+      const oldDisabled = localStorage.getItem("slate-disabled-engines");
+      if (oldDisabled) {
+        const parsed = JSON.parse(oldDisabled);
+        localStorage.setItem("slate-deleted-engines", JSON.stringify(parsed));
+        localStorage.removeItem("slate-disabled-engines");
+        return parsed;
+      }
+    } catch {}
+    return [];
   });
 
   const [isEditingCustomEngine, setIsEditingCustomEngine] = useState(false);
@@ -242,14 +253,20 @@ export default function SettingsPage() {
     return [];
   });
 
-  const [disabledServiceIds, setDisabledServiceIds] = useState<string[]>(() => {
+  const [deletedServiceIds, setDeletedServiceIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const saved = localStorage.getItem("slate-disabled-services");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+      const saved = localStorage.getItem("slate-deleted-services");
+      if (saved) return JSON.parse(saved);
+      const oldDisabled = localStorage.getItem("slate-disabled-services");
+      if (oldDisabled) {
+        const parsed = JSON.parse(oldDisabled);
+        localStorage.setItem("slate-deleted-services", JSON.stringify(parsed));
+        localStorage.removeItem("slate-disabled-services");
+        return parsed;
+      }
+    } catch {}
+    return SERVICES_PRESETS.filter((p) => !p.defaultEnabled).map((p) => p.id);
   });
 
   const [isEditingCustomService, setIsEditingCustomService] = useState(false);
@@ -679,32 +696,31 @@ export default function SettingsPage() {
     window.dispatchEvent(new Event("slate-search-engine-updated"));
   };
 
-  const handleToggleEngine = (id: string) => {
-    let updated: string[];
-    const isCurrentlyDisabled = disabledEngineIds.includes(id);
-
-    if (isCurrentlyDisabled) {
-      updated = disabledEngineIds.filter(x => x !== id);
-    } else {
-      const allEnginesCount = ENGINES.length + customEngines.length;
-      if (disabledEngineIds.length >= allEnginesCount - 1) {
-        return;
+  const handleDeleteEngine = (id: string) => {
+    if (searchEngineId === id) {
+      const remaining = [...ENGINES, ...customEngines].filter((e) => e.id !== id && !deletedEngineIds.includes(e.id));
+      if (remaining.length > 0) {
+        handleSearchEngineChange(remaining[0].id);
+      } else {
+        handleSearchEngineChange("google");
       }
-      updated = [...disabledEngineIds, id];
     }
 
-    setDisabledEngineIds(updated);
-    localStorage.setItem("slate-disabled-engines", JSON.stringify(updated));
-
-    if (!isCurrentlyDisabled && searchEngineId === id) {
-      const allList = [...ENGINES, ...customEngines];
-      const nextEnabled = allList.find(e => e.id !== id && !updated.includes(e.id));
-      if (nextEnabled) {
-        handleSearchEngineChange(nextEnabled.id);
-      }
+    if (!ENGINES.some((e) => e.id === id)) {
+      const updatedCustom = customEngines.filter((e) => e.id !== id);
+      handleSaveCustomEngines(updatedCustom);
     } else {
+      const updatedDeleted = [...deletedEngineIds, id];
+      setDeletedEngineIds(updatedDeleted);
+      localStorage.setItem("slate-deleted-engines", JSON.stringify(updatedDeleted));
       window.dispatchEvent(new Event("slate-search-engine-updated"));
     }
+  };
+
+  const handleRestoreDefaultEngines = () => {
+    setDeletedEngineIds([]);
+    localStorage.removeItem("slate-deleted-engines");
+    window.dispatchEvent(new Event("slate-search-engine-updated"));
   };
 
   // Custom Engine CRUD
@@ -768,16 +784,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteCustomEngineFromSettings = (id: string) => {
-    const updated = customEngines.filter(e => e.id !== id);
-    handleSaveCustomEngines(updated);
-    if (searchEngineId === id) {
-      handleSearchEngineChange("google");
-    }
-    if (disabledEngineIds.includes(id)) {
-      const updatedDisabled = disabledEngineIds.filter(x => x !== id);
-      setDisabledEngineIds(updatedDisabled);
-      localStorage.setItem("slate-disabled-engines", JSON.stringify(updatedDisabled));
-    }
+    handleDeleteEngine(id);
   };
 
   const handleMoveCustomEngine = (index: number, direction: "up" | "down") => {
@@ -796,22 +803,27 @@ export default function SettingsPage() {
     window.dispatchEvent(new Event("slate-services-settings-updated"));
   };
 
-  const handleToggleService = (id: string) => {
-    let updated: string[];
-    const isCurrentlyDisabled = disabledServiceIds.includes(id);
-
-    if (isCurrentlyDisabled) {
-      updated = disabledServiceIds.filter(x => x !== id);
-    } else {
-      const allServicesCount = SERVICES_PRESETS.length + customServices.length;
-      if (disabledServiceIds.length >= allServicesCount - 1) {
-        return;
-      }
-      updated = [...disabledServiceIds, id];
+  const handleDeleteService = (id: string) => {
+    const activeServices = [...SERVICES_PRESETS, ...customServices].filter((s) => s.id !== id && !deletedServiceIds.includes(s.id));
+    if (activeServices.length === 0) {
+      return;
     }
 
-    setDisabledServiceIds(updated);
-    localStorage.setItem("slate-disabled-services", JSON.stringify(updated));
+    if (!SERVICES_PRESETS.some((s) => s.id === id)) {
+      const updatedCustom = customServices.filter((s) => s.id !== id);
+      handleSaveCustomServices(updatedCustom);
+    } else {
+      const updatedDeleted = [...deletedServiceIds, id];
+      setDeletedServiceIds(updatedDeleted);
+      localStorage.setItem("slate-deleted-services", JSON.stringify(updatedDeleted));
+      window.dispatchEvent(new Event("slate-services-updated"));
+    }
+  };
+
+  const handleRestoreDefaultServices = () => {
+    const initial = SERVICES_PRESETS.filter((p) => !p.defaultEnabled).map((p) => p.id);
+    setDeletedServiceIds(initial);
+    localStorage.setItem("slate-deleted-services", JSON.stringify(initial));
     window.dispatchEvent(new Event("slate-services-updated"));
   };
 
@@ -875,13 +887,7 @@ export default function SettingsPage() {
   };
 
   const handleDeleteCustomServiceFromSettings = (id: string) => {
-    const updated = customServices.filter(e => e.id !== id);
-    handleSaveCustomServices(updated);
-    if (disabledServiceIds.includes(id)) {
-      const updatedDisabled = disabledServiceIds.filter(x => x !== id);
-      setDisabledServiceIds(updatedDisabled);
-      localStorage.setItem("slate-disabled-services", JSON.stringify(updatedDisabled));
-    }
+    handleDeleteService(id);
   };
 
   const handleMoveCustomService = (index: number, direction: "up" | "down") => {
@@ -1704,65 +1710,70 @@ export default function SettingsPage() {
 
               {/* Engine Grid */}
               <div className="flex flex-col gap-4">
-                <span className="text-sm font-medium text-[var(--foreground)]/90 flex items-center gap-2">
-                  Active Search Engine
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[var(--foreground)]/90 flex items-center gap-2">
+                    Active Search Engine
+                  </span>
+                  {deletedEngineIds.length > 0 && (
+                    <button
+                      onClick={handleRestoreDefaultEngines}
+                      className="text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent)]/80 transition-colors duration-200 cursor-pointer"
+                    >
+                      Restore Defaults
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {[...ENGINES, ...customEngines].map((engine) => {
-                    const isSel = searchEngineId === engine.id;
-                    const isEnabled = !disabledEngineIds.includes(engine.id);
-                    return (
-                      <div
-                        key={engine.id}
-                        onClick={() => {
-                          if (!isEnabled) {
-                            handleToggleEngine(engine.id);
-                          }
-                          handleSearchEngineChange(engine.id);
-                        }}
-                        className={`relative flex items-center gap-3.5 p-4 rounded-xl border text-left font-medium transition-all duration-300 cursor-pointer hover:-translate-y-[1px] active:translate-y-0
-                          ${isSel
-                            ? "bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] shadow-sm"
-                            : "bg-[var(--foreground)]/3 border-[var(--glass-border)] text-[var(--foreground)]/60 hover:bg-[var(--foreground)]/5"
-                          } ${!isEnabled ? "opacity-55 grayscale-[40%]" : ""}`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/40 flex items-center justify-center shrink-0">
-                          <img
-                            src={`https://www.google.com/s2/favicons?sz=64&domain=${"domain" in engine ? engine.domain : "example.com"}`}
-                            alt=""
-                            className="w-4 h-4 object-contain filter dark:brightness-95"
-                          />
-                        </div>
-                        <div className="flex flex-col min-w-0 pr-8">
-                          <span className="text-xs font-semibold leading-tight truncate flex items-center gap-1.5">
-                            {engine.name}
-                            {'url' in engine && !ENGINES.some(e => e.id === engine.id) && (
-                              <span className="text-[8px] px-1 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] font-medium uppercase tracking-wider">
-                                Custom
-                              </span>
-                            )}
-                          </span>
-                          <span className="text-[10px] text-[var(--foreground)]/45 truncate mt-0.5">{engine.domain}</span>
-                        </div>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleEngine(engine.id)}
-                            className={`relative w-8 h-[18px] rounded-full p-[2px] transition-colors duration-300 cursor-pointer ${
-                              isEnabled ? "bg-[var(--accent)]" : "bg-[var(--foreground)]/20"
+                  {[...ENGINES, ...customEngines]
+                    .filter((engine) => !deletedEngineIds.includes(engine.id))
+                    .map((engine) => {
+                      const isSel = searchEngineId === engine.id;
+                      return (
+                        <div
+                          key={engine.id}
+                          onClick={() => handleSearchEngineChange(engine.id)}
+                          className={`relative flex items-center gap-3.5 p-4 rounded-xl border text-left font-medium transition-all duration-300 cursor-pointer hover:-translate-y-[1px] active:translate-y-0
+                            ${isSel
+                              ? "bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)] shadow-sm"
+                              : "bg-[var(--foreground)]/3 border-[var(--glass-border)] text-[var(--foreground)]/60 hover:bg-[var(--foreground)]/5"
                             }`}
-                            title={isEnabled ? "Disable search engine" : "Enable search engine"}
-                          >
-                            <div
-                              className={`w-[14px] h-[14px] rounded-full bg-[var(--background)] shadow transition-transform duration-300 ${
-                                isEnabled ? "translate-x-[14px]" : "translate-x-0"
-                              }`}
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/40 flex items-center justify-center shrink-0">
+                            <img
+                              src={`https://www.google.com/s2/favicons?sz=64&domain=${"domain" in engine ? engine.domain : "example.com"}`}
+                              alt=""
+                              className="w-4 h-4 object-contain filter dark:brightness-95"
                             />
-                          </button>
+                          </div>
+                          <div className="flex flex-col min-w-0 pr-8">
+                            <span className="text-xs font-semibold leading-tight truncate flex items-center gap-1.5">
+                              {engine.name}
+                              {'url' in engine && !ENGINES.some(e => e.id === engine.id) && (
+                                <span className="text-[8px] px-1 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] font-medium uppercase tracking-wider">
+                                  Custom
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-[var(--foreground)]/45 truncate mt-0.5">{engine.domain}</span>
+                          </div>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteEngine(engine.id)}
+                              disabled={isSel}
+                              className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                                isSel
+                                  ? "opacity-20 cursor-not-allowed text-[var(--accent)]"
+                                  : "text-[var(--foreground)]/40 hover:text-rose-400 hover:bg-rose-500/10"
+                              }`}
+                              title={isSel ? "Active search engine cannot be deleted" : "Delete search engine"}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
                 <span className="text-[10px] text-[var(--foreground)]/40 leading-relaxed mt-1">
                   Changing the active engine immediately configures default prefixes and suggestion completions.
@@ -1887,7 +1898,6 @@ export default function SettingsPage() {
                         </span>
                         {customEngines.map((engine, idx) => {
                           const isActive = searchEngineId === engine.id;
-                          const isEnabled = !disabledEngineIds.includes(engine.id);
                           return (
                             <div
                               key={engine.id}
@@ -1895,13 +1905,8 @@ export default function SettingsPage() {
                                 isActive
                                   ? "border-[var(--accent)]/40 bg-[var(--accent)]/5"
                                   : "border-[var(--glass-border)]/30 bg-[var(--background)]/30 hover:bg-[var(--foreground)]/5"
-                              } ${!isEnabled ? "opacity-55 grayscale-[40%]" : ""}`}
-                              onClick={() => {
-                                if (!isEnabled) {
-                                  handleToggleEngine(engine.id);
-                                }
-                                handleSearchEngineChange(engine.id);
-                              }}
+                              }`}
+                              onClick={() => handleSearchEngineChange(engine.id)}
                             >
                               <div className="flex items-center gap-3 min-w-0">
                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
@@ -1975,70 +1980,79 @@ export default function SettingsPage() {
                     <div>
                       <h4 className="text-sm font-semibold text-[var(--foreground)]/90">Services Search (Special Mode)</h4>
                       <p className="text-[11px] text-[var(--foreground)]/45 mt-0.5">
-                        Configure search providers for Services mode. Toggle to enable/disable them.
+                        Configure search providers for Services mode. Delete them to hide them.
                       </p>
                     </div>
-                    <button
-                      onClick={handleStartAddCustomService}
-                      disabled={customServices.length >= CUSTOM_ENGINE_MAX}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-[var(--background)] hover:bg-[var(--accent)]/90 disabled:opacity-40 disabled:pointer-events-none rounded-lg transition-all duration-300 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add Service
-                    </button>
+                    <div className="flex items-center gap-2.5">
+                      {deletedServiceIds.length > 0 && (
+                        <button
+                          onClick={handleRestoreDefaultServices}
+                          className="text-xs font-semibold text-[var(--accent)] hover:text-[var(--accent)]/80 transition-colors duration-200 cursor-pointer"
+                        >
+                          Restore Defaults
+                        </button>
+                      )}
+                      <button
+                        onClick={handleStartAddCustomService}
+                        disabled={customServices.length >= CUSTOM_ENGINE_MAX}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[var(--accent)] text-[var(--background)] hover:bg-[var(--accent)]/90 disabled:opacity-40 disabled:pointer-events-none rounded-lg transition-all duration-300 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Service
+                      </button>
+                    </div>
                   </div>
 
                   {/* Preset Services Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {[...SERVICES_PRESETS, ...customServices].map((service) => {
-                      const isEnabled = !disabledServiceIds.includes(service.id);
-                      return (
-                        <div
-                          key={service.id}
-                          className={`relative flex items-center gap-3.5 p-4 rounded-xl border text-left font-medium transition-all duration-300 cursor-default
-                            bg-[var(--foreground)]/3 border-[var(--glass-border)] text-[var(--foreground)]/60
-                            ${!isEnabled ? "opacity-55 grayscale-[40%]" : ""}`}
-                        >
-                          <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/40 flex items-center justify-center shrink-0">
-                            <img
-                              src={`https://www.google.com/s2/favicons?sz=64&domain=${service.domain}`}
-                              alt=""
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                              }}
-                              className="w-4 h-4 object-contain filter dark:brightness-95"
-                            />
-                          </div>
-                          <div className="flex flex-col min-w-0 pr-8">
-                            <span className="text-xs font-semibold leading-tight truncate flex items-center gap-1.5">
-                              {service.name}
-                              {!SERVICES_PRESETS.some(e => e.id === service.id) && (
-                                <span className="text-[8px] px-1 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] font-medium uppercase tracking-wider">
-                                  Custom
-                                </span>
-                              )}
-                            </span>
-                            <span className="text-[10px] text-[var(--foreground)]/45 truncate mt-0.5">{service.domain}</span>
-                          </div>
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleService(service.id)}
-                              className={`relative w-8 h-[18px] rounded-full p-[2px] transition-colors duration-300 cursor-pointer ${
-                                isEnabled ? "bg-[var(--accent)]" : "bg-[var(--foreground)]/20"
-                              }`}
-                              title={isEnabled ? "Disable service" : "Enable service"}
-                            >
-                              <div
-                                className={`w-[14px] h-[14px] rounded-full bg-[var(--background)] shadow transition-transform duration-300 ${
-                                  isEnabled ? "translate-x-[14px]" : "translate-x-0"
-                                }`}
+                    {[...SERVICES_PRESETS, ...customServices]
+                      .filter((service) => !deletedServiceIds.includes(service.id))
+                      .map((service, idx, arr) => {
+                        const isLast = arr.length <= 1;
+                        return (
+                          <div
+                            key={service.id}
+                            className="relative flex items-center gap-3.5 p-4 rounded-xl border text-left font-medium transition-all duration-300 cursor-default bg-[var(--foreground)]/3 border-[var(--glass-border)] text-[var(--foreground)]/60"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/40 flex items-center justify-center shrink-0">
+                              <img
+                                src={`https://www.google.com/s2/favicons?sz=64&domain=${service.domain}`}
+                                alt=""
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                }}
+                                className="w-4 h-4 object-contain filter dark:brightness-95"
                               />
-                            </button>
+                            </div>
+                            <div className="flex flex-col min-w-0 pr-8">
+                              <span className="text-xs font-semibold leading-tight truncate flex items-center gap-1.5">
+                                {service.name}
+                                {!SERVICES_PRESETS.some((e) => e.id === service.id) && (
+                                  <span className="text-[8px] px-1 py-0.5 rounded-full bg-[var(--accent)]/8 text-[var(--accent)] font-medium uppercase tracking-wider">
+                                    Custom
+                                  </span>
+                                )}
+                              </span>
+                              <span className="text-[10px] text-[var(--foreground)]/45 truncate mt-0.5">{service.domain}</span>
+                            </div>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteService(service.id)}
+                                disabled={isLast}
+                                className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${
+                                  isLast
+                                    ? "opacity-20 cursor-not-allowed text-[var(--foreground)]/30"
+                                    : "text-[var(--foreground)]/40 hover:text-rose-400 hover:bg-rose-500/10"
+                                }`}
+                                title={isLast ? "At least one service must remain" : "Delete service"}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
 
                   {/* Custom Services Section */}
@@ -2052,12 +2066,10 @@ export default function SettingsPage() {
                         {customServices.length} / {CUSTOM_ENGINE_MAX} Services
                       </span>
                       {customServices.map((service, idx) => {
-                        const isEnabled = !disabledServiceIds.includes(service.id);
                         return (
                           <div
                             key={service.id}
-                            className={`flex items-center justify-between gap-4 p-3 rounded-xl border border-[var(--glass-border)]/30 bg-[var(--background)]/30 transition-all duration-200
-                              ${!isEnabled ? "opacity-55 grayscale-[40%]" : ""}`}
+                            className="flex items-center justify-between gap-4 p-3 rounded-xl border border-[var(--glass-border)]/30 bg-[var(--background)]/30 transition-all duration-200"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border bg-[var(--foreground)]/5 border-[var(--glass-border)]/35">
