@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Slate Tabs",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "slate-tabs@itssljk"
+    }
+  },
   "version": "1.0.0",
-  "description": "A clean, minimal, and dark-themed browser start page.",
+  "description": "A clean, minimal, and ambient-themed browser start page with dynamic greetings, quick search, and custom controls.",
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
