@@ -5,6 +5,7 @@ export const siteConfig = {
   url: "https://github.com/itssljk/slate-tabs",
   links: {
     github: "https://github.com/itssljk/slate-tabs",
+    discord: "https://discord.gg/Kfn4V2nF3N",
   },
   mainNav: [
     {

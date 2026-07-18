@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SearchBar from "@/components/widgets/SearchBar";
 import Greeting from "@/components/widgets/Greeting";
 import WeatherWidget from "@/components/widgets/WeatherWidget";
@@ -21,10 +22,15 @@ export default function Home() {
         <Quicklinks />
       </main>
 
-      <footer className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-10 pointer-events-none select-none flex flex-col gap-1 items-end animate-fade-in-up">
-        <span className="text-[9px] tracking-[0.15em] font-light text-[var(--foreground)]/40 dark:text-[var(--accent)]/50 uppercase text-readable" suppressHydrationWarning>
+      <footer className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-10 pointer-events-none select-none flex flex-col gap-1.5 items-end animate-fade-in-up">
+        <span className="text-[9px] tracking-[0.15em] font-light text-[var(--foreground)]/40 dark:text-[var(--accent)]/55 uppercase text-readable" suppressHydrationWarning>
           &copy; {new Date().getFullYear()} {siteConfig.name}
         </span>
+        <div className="flex gap-2 text-[8px] tracking-[0.15em] font-light text-[var(--foreground)]/30 uppercase pointer-events-auto">
+          <Link href="/tos" className="hover:text-[var(--accent)] transition-colors cursor-pointer">Terms</Link>
+          <span>&middot;</span>
+          <Link href="/privacy" className="hover:text-[var(--accent)] transition-colors cursor-pointer">Privacy</Link>
+        </div>
       </footer>
 
       <WeatherWidget />

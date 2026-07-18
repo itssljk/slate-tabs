@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:extension": "next build && node scripts/fix-csp.js",
+    "build": "next build && node scripts/fix-csp.js",
+    "build:extension": "npm run build",
     "start": "next start",
     "lint": "eslint"
   },
