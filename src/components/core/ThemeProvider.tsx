@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import { safeLocalStorage } from "@/utils/safeStorage";
 
 type Theme = "dark" | "light";
 
@@ -18,7 +19,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial theme from DOM or localStorage
-    const savedTheme = localStorage.getItem("slate-theme") as Theme | null;
+    const savedTheme = safeLocalStorage.getItem("slate-theme") as Theme | "";
     const initialTheme = savedTheme || "dark";
     document.documentElement.setAttribute("data-theme", initialTheme);
 
@@ -30,19 +31,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  const setTheme = (newTheme: Theme) => {
+  const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem("slate-theme", newTheme);
+    safeLocalStorage.setItem("slate-theme", newTheme);
     document.documentElement.setAttribute("data-theme", newTheme);
-  };
+  }, []);
 
-  const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  };
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    theme,
+    setTheme,
+    toggleTheme
+  }), [theme, setTheme, toggleTheme]);
 
   // Avoid rendering blank screen or layout shifts on server
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {mounted ? children : <div style={{ visibility: "hidden" }}>{children}</div>}
     </ThemeContext.Provider>
   );

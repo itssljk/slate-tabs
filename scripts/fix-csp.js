@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs');
 const path = require('path');
 
@@ -90,7 +91,7 @@ function processFiles() {
     }
   });
 
-  // 3. Walk all files (including newly created ones) and replace "_next" with "next"
+  // 3. Walk all files (including newly created ones) and replace "_next" path references with "next"
   const allFiles = walk(outDir);
   allFiles.forEach(file => {
     const ext = path.extname(file).toLowerCase();
@@ -99,16 +100,21 @@ function processFiles() {
 
     let content = fs.readFileSync(file, 'utf8');
     if (content.includes('_next')) {
-      content = content.split('_next').join('next');
+      content = content.replace(/\/_next\//g, '/next/')
+                       .replace(/\b_next\//g, 'next/')
+                       .replace(/"_next\//g, '"next/');
       fs.writeFileSync(file, content, 'utf8');
-      console.log(`- Replaced "_next" references in: ./${path.relative(outDir, file)}`);
+      console.log(`- Replaced "_next" path references in: ./${path.relative(outDir, file)}`);
     }
   });
 
-  // 4. Rename the _next directory to next
+  // 4. Rename the _next directory to next (cleaning up target if it already exists, preventing Windows crashes)
   const oldNextDir = path.join(outDir, '_next');
   const newNextDir = path.join(outDir, 'next');
   if (fs.existsSync(oldNextDir)) {
+    if (fs.existsSync(newNextDir)) {
+      fs.rmSync(newNextDir, { recursive: true, force: true });
+    }
     fs.renameSync(oldNextDir, newNextDir);
     console.log('- Renamed _next directory to next');
   }

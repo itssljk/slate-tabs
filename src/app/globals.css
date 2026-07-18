@@ -225,12 +225,10 @@ body::after {
   from {
     opacity: 0;
     transform: translateY(8px);
-    filter: blur(2px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: blur(0);
   }
 }
 
@@ -325,12 +323,10 @@ html[data-bg-custom="true"] .weather-location {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.96);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0);
   }
 }
 
@@ -354,16 +350,6 @@ html[data-bg-custom="true"] .weather-location {
 }
 
 /* Settings Controls via HTML dataset attributes */
-[data-minimal="true"] footer {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(10px);
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  transition: opacity 0.5s ease, transform 0.5s ease, height 0.5s ease, margin 0.5s ease, padding 0.5s ease;
-}
 
 [data-glow="false"] .animate-breathe {
   animation: none !important;
@@ -609,6 +595,75 @@ html[data-bg-custom="true"] .custom-scrollbar {
 .scrollbar-none {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* ════════════════════════════════════════════
+   CUSTOM RANGE INPUTS (COLOR PICKERS)
+   ════════════════════════════════════════════ */
+.color-picker-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  width: 100%;
+}
+
+.color-picker-slider:focus {
+  outline: none;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.color-picker-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.color-picker-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px; /* Centers the thumb vertically on a 6px track */
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.color-picker-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background-color: var(--accent);
+}
+
+/* Firefox */
+.color-picker-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.color-picker-slider::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.color-picker-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+/* Dim overlay text readability override on custom backgrounds */
+html[data-bg-custom="true"] .text-readable {
+  font-weight: 500;
+  color: var(--foreground) !important;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
 }
 
 

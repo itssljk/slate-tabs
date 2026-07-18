@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { safeLocalStorage } from "@/utils/safeStorage";
 import {
   Cloud,
   CloudDrizzle,
@@ -71,16 +72,48 @@ function getDescription(code: number): string {
   return WMO_CODES[code]?.description ?? "Unknown";
 }
 
-function getLocationName(lat: number, lon: number): Promise<string> {
+interface CachedGeoLocation {
+  lat: number;
+  lon: number;
+  name: string;
+  timestamp: number;
+}
+
+async function getLocationName(lat: number, lon: number): Promise<string> {
+  const cachedData = safeLocalStorage.getItem("slate-weather-cached-location");
+  if (cachedData) {
+    try {
+      const cached: CachedGeoLocation = JSON.parse(cachedData);
+      const distance = Math.sqrt(Math.pow(cached.lat - lat, 2) + Math.pow(cached.lon - lon, 2));
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      if (distance < 0.02 && (Date.now() - cached.timestamp < oneDayMs)) {
+        return cached.name;
+      }
+    } catch (e) {
+      console.warn("Failed to parse cached weather location:", e);
+    }
+  }
+
   return fetch(
     `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=10`,
-    { headers: { "Accept-Language": navigator.language } }
+    { 
+      headers: { 
+        "Accept-Language": navigator.language,
+        "User-Agent": "SlateTabsStartPage/1.0 (https://github.com/itssljk/slate-tabs)"
+      } 
+    }
   )
     .then((r) => r.json())
     .then((data) => {
       if (data?.address) {
         const a = data.address;
-        return a.city || a.town || a.village || a.municipality || a.county || a.state || a.country || "";
+        const name = a.city || a.town || a.village || a.municipality || a.county || a.state || a.country || "";
+        if (name) {
+          safeLocalStorage.setItem("slate-weather-cached-location", JSON.stringify({
+            lat, lon, name, timestamp: Date.now()
+          }));
+        }
+        return name;
       }
       return "";
     })
@@ -91,18 +124,26 @@ export default function WeatherWidget() {
   const [loaded, setLoaded] = useState(false);
   const [enabled, setEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
-    return localStorage.getItem("slate-settings-weather") !== "false";
+    return safeLocalStorage.getItem("slate-settings-weather") !== "false";
   });
   const [tempUnit, setTempUnit] = useState<"celsius" | "fahrenheit">(() => {
     if (typeof window === "undefined") return "celsius";
-    return (localStorage.getItem("slate-temp-unit") || "celsius") as "celsius" | "fahrenheit";
+    return (safeLocalStorage.getItem("slate-temp-unit") || "celsius") as "celsius" | "fahrenheit";
   });
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const weatherRef = useRef<WeatherData | null>(null);
+  const isMountedRef = useRef<boolean>(true);
 
   useEffect(() => {
     weatherRef.current = weather;
   }, [weather]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const loadWeather = useCallback(async () => {
     try {
@@ -117,7 +158,7 @@ export default function WeatherWidget() {
       });
 
       const { latitude, longitude } = position.coords;
-      localStorage.setItem("slate-weather-location-granted", "true");
+      safeLocalStorage.setItem("slate-weather-location-granted", "true");
       const params = new URLSearchParams({
         latitude: latitude.toString(),
         longitude: longitude.toString(),
@@ -130,26 +171,41 @@ export default function WeatherWidget() {
         getLocationName(latitude, longitude),
       ]);
 
-      setWeather({
-        current: {
-          temperature: Math.round(weatherRes.current.temperature_2m),
-          weatherCode: weatherRes.current.weather_code,
-        },
-        location,
-      });
+      if (isMountedRef.current) {
+        setWeather({
+          current: {
+            temperature: Math.round(weatherRes.current.temperature_2m),
+            weatherCode: weatherRes.current.weather_code,
+          },
+          location,
+        });
+      }
     } catch (error) {
       if (error && typeof error === "object" && "code" in error && error.code === 1) {
-        localStorage.setItem("slate-weather-location-granted", "false");
+        safeLocalStorage.setItem("slate-weather-location-granted", "false");
       }
       // silently fail — weather is non-essential
     }
   }, []);
 
   useEffect(() => {
+    let active = true;
+    let permissionStatus: PermissionStatus | null = null;
+
+    const handlePermissionChange = () => {
+      if (permissionStatus && active) {
+        if (permissionStatus.state === "granted") {
+          loadWeather();
+        } else if (permissionStatus.state === "denied") {
+          setWeather(null);
+        }
+      }
+    };
+
     const initWeather = async () => {
-      const savedEnabled = localStorage.getItem("slate-settings-weather") !== "false";
+      const savedEnabled = safeLocalStorage.getItem("slate-settings-weather") !== "false";
       if (!savedEnabled) {
-        setLoaded(true);
+        if (active) setLoaded(true);
         return;
       }
 
@@ -157,46 +213,45 @@ export default function WeatherWidget() {
       try {
         if (navigator.permissions && navigator.permissions.query) {
           const status = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+          permissionStatus = status;
           if (status.state === "granted") {
             shouldLoad = true;
           }
-          status.onchange = () => {
-            if (status.state === "granted") {
-              loadWeather();
-            } else if (status.state === "denied") {
-              setWeather(null);
-            }
-          };
+          status.addEventListener("change", handlePermissionChange);
         } else {
-          shouldLoad = localStorage.getItem("slate-weather-location-granted") === "true";
+          shouldLoad = safeLocalStorage.getItem("slate-weather-location-granted") === "true";
         }
       } catch {
-        shouldLoad = localStorage.getItem("slate-weather-location-granted") === "true";
+        shouldLoad = safeLocalStorage.getItem("slate-weather-location-granted") === "true";
       }
 
-      if (shouldLoad) {
+      if (shouldLoad && active) {
         await loadWeather();
       }
-      setLoaded(true);
+      if (active) setLoaded(true);
     };
 
     initWeather();
 
     const handleUpdate = () => {
-      const newEnabled = localStorage.getItem("slate-settings-weather") !== "false";
+      const newEnabled = safeLocalStorage.getItem("slate-settings-weather") !== "false";
       setEnabled(newEnabled);
       if (newEnabled && !weatherRef.current) loadWeather();
     };
 
     const handleTempUnitUpdate = () => {
-      setTempUnit((localStorage.getItem("slate-temp-unit") || "celsius") as "celsius" | "fahrenheit");
+      setTempUnit((safeLocalStorage.getItem("slate-temp-unit") || "celsius") as "celsius" | "fahrenheit");
     };
 
     window.addEventListener("slate-weather-updated", handleUpdate);
     window.addEventListener("slate-temp-unit-updated", handleTempUnitUpdate);
     return () => {
+      active = false;
       window.removeEventListener("slate-weather-updated", handleUpdate);
       window.removeEventListener("slate-temp-unit-updated", handleTempUnitUpdate);
+      if (permissionStatus) {
+        permissionStatus.removeEventListener("change", handlePermissionChange);
+      }
     };
   }, [loadWeather]);
 

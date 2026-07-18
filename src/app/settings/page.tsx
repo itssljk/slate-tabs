@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
-  ChevronLeft, Eye, Shield, Cpu, User, Palette,
+  ChevronLeft, ChevronRight, Eye, Cpu, User, Palette,
   Image as ImageIcon, Upload, Link as LinkIcon,
   Sparkles, Trash2, Loader2, Check, Globe, Moon, Sun, CloudSun,
   LayoutGrid, Plus, ArrowUp, ArrowDown, Pencil, X, Layers, Thermometer, Mail
@@ -15,6 +15,7 @@ import { ACCENT_PRESETS, getLightAccentColor, hexToHsl, hslToHex } from "@/utils
 import { CURATED_BACKGROUNDS } from "@/utils/backgrounds";
 import { DEFAULT_QUICKLINKS, getDomain, type Quicklink } from "@/utils/quicklinks";
 import { siteConfig } from "@/config/site";
+import { safeLocalStorage as localStorage } from "@/utils/safeStorage";
 
 const ENGINES = [
   { id: "google", name: "Google", domain: "google.com" },
@@ -47,7 +48,189 @@ type Tab = "general" | "appearance" | "background" | "search" | "quicklinks";
 function generateUniqueId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
- 
+
+function SettingsFavicon({ domain, title }: { domain: string; title: string }) {
+  const [error, setError] = useState(false);
+  if (error || !domain) {
+    return (
+      <span className="text-xs font-semibold text-[var(--accent)] select-none">
+        {title.charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`}
+      alt=""
+      onError={() => setError(true)}
+      className="w-4 h-4 object-contain filter dark:brightness-95"
+    />
+  );
+}
+
+function CustomPickerPanel({
+  initialHsl,
+  initialColor,
+  theme,
+  onColorChange
+}: {
+  initialHsl: { h: number; s: number; l: number };
+  initialColor: string;
+  theme: string;
+  onColorChange: (hex: string, hsl: { h: number; s: number; l: number }) => void;
+}) {
+  const [hsl, setHsl] = useState(initialHsl);
+  const [hex, setHex] = useState(initialColor);
+  const [hexInput, setHexInput] = useState(initialColor);
+  const [hexError, setHexError] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHsl(initialHsl);
+    setHex(initialColor);
+    setHexInput(initialColor);
+  }, [initialHsl, initialColor]);
+
+  const updateHsl = (key: "h" | "s" | "l", val: number) => {
+    const nextHsl = { ...hsl, [key]: val };
+    setHsl(nextHsl);
+    const darkHex = hslToHex(nextHsl.h, nextHsl.s, nextHsl.l);
+    setHex(darkHex);
+    setHexInput(darkHex);
+
+    const lightColor = getLightAccentColor(darkHex);
+    document.documentElement.style.setProperty('--custom-accent', darkHex);
+    document.documentElement.style.setProperty('--custom-accent-light', lightColor);
+    document.documentElement.setAttribute("data-accent", "custom");
+  };
+
+  const handleDragEnd = () => {
+    onColorChange(hex, hsl);
+  };
+
+  const handleHexChange = (val: string) => {
+    setHexInput(val);
+    setHexError(false);
+  };
+
+  const handleHexSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanHex = hexInput.trim().replace(/^#+/, "");
+    if (/^[0-9A-Fa-f]{6}$/.test(cleanHex)) {
+      const fullHex = `#${cleanHex}`;
+      const parsedHsl = hexToHsl(fullHex);
+      setHsl(parsedHsl);
+      setHex(fullHex);
+      
+      const lightColor = getLightAccentColor(fullHex);
+      document.documentElement.style.setProperty('--custom-accent', fullHex);
+      document.documentElement.style.setProperty('--custom-accent-light', lightColor);
+      document.documentElement.setAttribute("data-accent", "custom");
+      onColorChange(fullHex, parsedHsl);
+    } else {
+      setHexError(true);
+    }
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6 p-5 rounded-xl bg-[var(--foreground)]/3 border border-[var(--glass-border)]/40 max-w-2xl mt-1 animate-suggest-in">
+      <div className="flex-1 flex flex-col gap-4">
+        {/* Hue */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
+            <span>Hue</span>
+            <span>{hsl.h}°</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="360"
+            value={hsl.h}
+            onInput={(e) => updateHsl("h", parseInt((e.target as HTMLInputElement).value))}
+            onChange={handleDragEnd}
+            className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
+            style={{
+              background: "linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)",
+            }}
+          />
+        </div>
+
+        {/* Saturation */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
+            <span>Saturation</span>
+            <span>{hsl.s}%</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={hsl.s}
+            onInput={(e) => updateHsl("s", parseInt((e.target as HTMLInputElement).value))}
+            onChange={handleDragEnd}
+            className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, hsl(${hsl.h}, 0%, ${hsl.l}%), hsl(${hsl.h}, 100%, ${hsl.l}%))`,
+            }}
+          />
+        </div>
+
+        {/* Lightness */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
+            <span>Lightness</span>
+            <span>{hsl.l}%</span>
+          </div>
+          <input
+            type="range"
+            min="10"
+            max="90"
+            value={hsl.l}
+            onInput={(e) => updateHsl("l", parseInt((e.target as HTMLInputElement).value))}
+            onChange={handleDragEnd}
+            className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #000000, hsl(${hsl.h}, ${hsl.s}%, 50%), #ffffff)`,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Hex Text Field and Live Indicator */}
+      <div className="w-full md:w-[180px] shrink-0 flex flex-col gap-3 justify-center items-center md:border-l md:border-[var(--glass-border)]/40 md:pl-6">
+        <div
+          className="w-16 h-16 rounded-2xl border border-[var(--foreground)]/10 shadow-inner flex items-center justify-center text-xs font-mono font-bold tracking-tight select-all cursor-pointer"
+          style={{
+            backgroundColor: theme === "light" ? getLightAccentColor(hex) : hex,
+            color: hsl.l > 60 && theme === "light" ? "#1e2330" : "#ffffff"
+          }}
+        >
+          Color
+        </div>
+        <div className="flex flex-col gap-1 w-full text-center">
+          <label className="text-[10px] font-semibold tracking-wider text-[var(--foreground)]/50 uppercase">Hex Color Value</label>
+          <form onSubmit={handleHexSubmit} className="flex gap-1.5 justify-center mt-1">
+            <input
+              type="text"
+              value={hexInput}
+              onChange={(e) => handleHexChange(e.target.value)}
+              className={`w-20 text-center text-xs font-semibold px-2 py-1 rounded-lg bg-[var(--foreground)]/5 border transition-all duration-300 ${
+                hexError ? "border-rose-500/50" : "border-[var(--glass-border)]"
+              }`}
+            />
+            <button
+              type="submit"
+              className="px-2 py-1 bg-[var(--accent)] text-[var(--background)] hover:bg-[var(--accent)]/90 text-xs font-semibold rounded-lg hover:shadow-[0_0_8px_var(--accent-glow)] transition-all duration-300 cursor-pointer active:scale-95"
+            >
+              OK
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("general");
@@ -60,10 +243,6 @@ export default function SettingsPage() {
   const [glowEnabled, setGlowEnabled] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("slate-settings-glow") !== "false";
-  });
-  const [minimalLayout, setMinimalLayout] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("slate-settings-minimal") === "true";
   });
   const [performanceMode, setPerformanceMode] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -140,10 +319,6 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return { h: 147, s: 18, l: 56 };
     const savedCustom = localStorage.getItem("slate-custom-accent") || "#7ca38e";
     return hexToHsl(savedCustom);
-  });
-  const [hexInputValue, setHexInputValue] = useState(() => {
-    if (typeof window === "undefined") return "#7ca38e";
-    return localStorage.getItem("slate-custom-accent") || "#7ca38e";
   });
 
   // Background States
@@ -390,12 +565,6 @@ export default function SettingsPage() {
     document.documentElement.setAttribute("data-glow", val ? "true" : "false");
   };
 
-  const handleMinimalChange = (val: boolean) => {
-    setMinimalLayout(val);
-    localStorage.setItem("slate-settings-minimal", val ? "true" : "false");
-    document.documentElement.setAttribute("data-minimal", val ? "true" : "false");
-  };
-
   const handlePerfChange = (val: boolean) => {
     setPerformanceMode(val);
     localStorage.setItem("slate-settings-perf", val ? "true" : "false");
@@ -534,63 +703,17 @@ export default function SettingsPage() {
     }
   };
 
-  const handleHslInput = (key: "h" | "s" | "l", val: number) => {
-    const newHsl = { ...customHsl, [key]: val };
-    setCustomHsl(newHsl);
+  const handleCustomColorSave = (hex: string, hsl: { h: number; s: number; l: number }) => {
+    setCustomColor(hex);
+    setCustomHsl(hsl);
 
-    const darkHex = hslToHex(newHsl.h, newHsl.s, newHsl.l);
-    setHexInputValue(darkHex);
-
-    const lightColor = getLightAccentColor(darkHex);
-    document.documentElement.style.setProperty('--custom-accent', darkHex);
-    document.documentElement.style.setProperty('--custom-accent-light', lightColor);
-    document.documentElement.setAttribute("data-accent", "custom");
-  };
-
-  const handleHslChange = (key: "h" | "s" | "l", val: number) => {
-    const newHsl = { ...customHsl, [key]: val };
-    setCustomHsl(newHsl);
-
-    const darkHex = hslToHex(newHsl.h, newHsl.s, newHsl.l);
-    setCustomColor(darkHex);
-    setHexInputValue(darkHex);
-
-    const lightColor = getLightAccentColor(darkHex);
-    localStorage.setItem("slate-custom-accent", darkHex);
+    const lightColor = getLightAccentColor(hex);
+    localStorage.setItem("slate-custom-accent", hex);
     localStorage.setItem("slate-accent-light", lightColor);
     
     setAccentColor("custom");
     localStorage.setItem("slate-accent", "custom");
     document.documentElement.setAttribute("data-accent", "custom");
-  };
-
-  const handleHexInputChange = (val: string) => {
-    setHexInputValue(val);
-
-    const hexRegex = /^#?([0-9A-F]{3}){1,2}$/i;
-    let cleanHex = val.trim();
-    if (!cleanHex.startsWith('#')) {
-      cleanHex = '#' + cleanHex;
-    }
-
-    if (hexRegex.test(cleanHex)) {
-      if (cleanHex.length === 4 || cleanHex.length === 7) {
-        setCustomColor(cleanHex);
-        const hsl = hexToHsl(cleanHex);
-        setCustomHsl(hsl);
-
-        const lightColor = getLightAccentColor(cleanHex);
-        localStorage.setItem("slate-custom-accent", cleanHex);
-        localStorage.setItem("slate-accent-light", lightColor);
-
-        setAccentColor("custom");
-        localStorage.setItem("slate-accent", "custom");
-        document.documentElement.setAttribute("data-accent", "custom");
-
-        document.documentElement.style.setProperty('--custom-accent', cleanHex);
-        document.documentElement.style.setProperty('--custom-accent-light', lightColor);
-      }
-    }
   };
 
   const handleBgTypeChange = (type: "default" | "curated" | "upload" | "url") => {
@@ -1220,95 +1343,12 @@ export default function SettingsPage() {
 
               {/* Custom Picker Panel */}
               {accentColor === "custom" && (
-                <div className="flex flex-col md:flex-row gap-6 p-5 rounded-xl bg-[var(--foreground)]/3 border border-[var(--glass-border)]/40 max-w-2xl mt-1 animate-suggest-in">
-                  
-                  {/* Hue, Saturation, Lightness range */}
-                  <div className="flex-1 flex flex-col gap-4">
-                    {/* Hue */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
-                        <span>Hue</span>
-                        <span>{customHsl.h}°</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="360"
-                        value={customHsl.h}
-                        onInput={(e) => handleHslInput("h", parseInt((e.target as HTMLInputElement).value))}
-                        onChange={(e) => handleHslChange("h", parseInt((e.target as HTMLInputElement).value))}
-                        className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
-                        style={{
-                          background: "linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)",
-                        }}
-                      />
-                    </div>
-
-                    {/* Saturation */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
-                        <span>Saturation</span>
-                        <span>{customHsl.s}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={customHsl.s}
-                        onInput={(e) => handleHslInput("s", parseInt((e.target as HTMLInputElement).value))}
-                        onChange={(e) => handleHslChange("s", parseInt((e.target as HTMLInputElement).value))}
-                        className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
-                        style={{
-                          background: `linear-gradient(to right, hsl(${customHsl.h}, 0%, ${customHsl.l}%), hsl(${customHsl.h}, 100%, ${customHsl.l}%))`,
-                        }}
-                      />
-                    </div>
-
-                    {/* Lightness */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex justify-between text-xs font-medium text-[var(--foreground)]/80">
-                        <span>Lightness</span>
-                        <span>{customHsl.l}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="10"
-                        max="90"
-                        value={customHsl.l}
-                        onInput={(e) => handleHslInput("l", parseInt((e.target as HTMLInputElement).value))}
-                        onChange={(e) => handleHslChange("l", parseInt((e.target as HTMLInputElement).value))}
-                        className="color-picker-slider w-full h-2 rounded-lg cursor-pointer"
-                        style={{
-                          background: `linear-gradient(to right, #000000, hsl(${customHsl.h}, ${customHsl.s}%, 50%), #ffffff)`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Hex Text Field and Live Indicator */}
-                  <div className="w-full md:w-[180px] shrink-0 flex flex-col gap-3 justify-center items-center md:border-l md:border-[var(--glass-border)]/40 md:pl-6">
-                    <div
-                      className="w-16 h-16 rounded-2xl border border-[var(--foreground)]/10 shadow-inner flex items-center justify-center text-xs font-mono font-bold tracking-tight select-all cursor-pointer"
-                      style={{
-                        backgroundColor: theme === "light" ? getLightAccentColor(customColor) : customColor,
-                        color: customHsl.l > 60 && theme === "light" ? "#1e2330" : "#ffffff"
-                      }}
-                    >
-                      Color
-                    </div>
-                    <div className="flex flex-col gap-1 w-full text-center">
-                      <label className="text-[10px] font-semibold tracking-wider text-[var(--foreground)]/50 uppercase">Hex Color Value</label>
-                      <input
-                        type="text"
-                        value={hexInputValue}
-                        onChange={(e) => handleHexInputChange(e.target.value)}
-                        placeholder="#FFFFFF"
-                        maxLength={7}
-                        className="w-full h-8 px-2 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)] text-center text-sm text-[var(--foreground)] font-mono focus:outline-none focus:border-[var(--accent)] transition-all duration-300"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <CustomPickerPanel
+                  initialHsl={customHsl}
+                  initialColor={customColor}
+                  theme={theme}
+                  onColorChange={handleCustomColorSave}
+                />
               )}
 
               {/* Layout & Animation Options */}
@@ -1336,30 +1376,6 @@ export default function SettingsPage() {
                     <div
                       className={`w-5 h-5 rounded-full bg-[var(--background)] shadow transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
                         glowEnabled ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Minimal Layout */}
-                <div className="flex items-center justify-between py-3 border-b border-[var(--glass-border)]/40">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium text-[var(--foreground)]/90 flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-[var(--accent)]" /> Minimal Layout
-                    </span>
-                    <span className="text-xs text-[var(--foreground)]/50">
-                      Hides bottom footer copyright and project branding.
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleMinimalChange(!minimalLayout)}
-                    className={`relative w-11 h-6 rounded-full p-0.5 transition-colors duration-400 cursor-pointer ${
-                      minimalLayout ? "bg-[var(--accent)]" : "bg-[var(--foreground)]/20 dark:bg-[var(--foreground)]/10"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-[var(--background)] shadow transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                        minimalLayout ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -1565,7 +1581,7 @@ export default function SettingsPage() {
                                 onClick={() => setPicsumPage((p) => p + 1)}
                                 className="px-3.5 py-1.5 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/40 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--foreground)]/10 cursor-pointer flex items-center gap-1 transition-all duration-300"
                               >
-                                Next <ChevronLeft className="w-4 h-4 rotate-180" />
+                                Next <ChevronRight className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
@@ -2392,14 +2408,7 @@ export default function SettingsPage() {
                               >
                                 <div className="flex items-center gap-3 min-w-0">
                                   <div className="w-8 h-8 rounded-lg bg-[var(--foreground)]/5 border border-[var(--glass-border)]/35 flex items-center justify-center shrink-0">
-                                    <img
-                                      src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`}
-                                      alt=""
-                                      onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                      }}
-                                      className="w-4 h-4 object-contain filter dark:brightness-95"
-                                    />
+                                    <SettingsFavicon domain={domain} title={link.title} />
                                   </div>
                                   <div className="flex flex-col min-w-0">
                                     <span className="text-xs font-semibold leading-tight truncate">{link.title}</span>
@@ -2460,6 +2469,12 @@ export default function SettingsPage() {
 
         </section>
       </main>
+
+      <footer className="w-full max-w-5xl mx-auto pt-8 pb-4 flex justify-end border-t border-[var(--glass-border)]/20 mt-8 select-none" suppressHydrationWarning>
+        <span className="text-[9px] tracking-[0.15em] font-light text-[var(--foreground)]/40 uppercase">
+          &copy; {new Date().getFullYear()} {siteConfig.name}
+        </span>
+      </footer>
     </div>
   );
 }

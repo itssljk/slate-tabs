@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { Search, X, SlidersHorizontal, Globe, Layers, Check, Settings } from "lucide-react";
 import { getSettingsUrl } from "@/utils/navigation";
+import { safeLocalStorage } from "@/utils/safeStorage";
 
 interface SearchEngine {
   id: string;
@@ -33,12 +35,23 @@ function jsonpFetch(url: string, callbackParam: string, timeoutMs = 5000): Promi
 
     const cleanup = () => {
       clearTimeout(timeout);
-      (window as unknown as Record<string, unknown>)[callbackName] = () => {};
+      (window as unknown as Record<string, unknown>)[callbackName] = () => {
+        try {
+          delete (window as unknown as Record<string, unknown>)[callbackName];
+        } catch {
+          (window as unknown as Record<string, unknown>)[callbackName] = undefined;
+        }
+      };
       if (script.parentNode) script.parentNode.removeChild(script);
     };
 
     (window as unknown as Record<string, unknown>)[callbackName] = (data: unknown) => {
       cleanup();
+      try {
+        delete (window as unknown as Record<string, unknown>)[callbackName];
+      } catch {
+        (window as unknown as Record<string, unknown>)[callbackName] = undefined;
+      }
       resolve(data);
     };
 
@@ -49,6 +62,23 @@ function jsonpFetch(url: string, callbackParam: string, timeoutMs = 5000): Promi
     };
     document.head.appendChild(script);
   });
+}
+
+async function fetchSuggestion(url: string, callbackParam: string): Promise<unknown> {
+  const isExtension = typeof window !== "undefined" && (
+    window.location.protocol === "chrome-extension:" ||
+    window.location.protocol === "moz-extension:"
+  );
+
+  if (isExtension) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("Fetch suggestion failed");
+    }
+    return await res.json();
+  } else {
+    return jsonpFetch(url, callbackParam);
+  }
 }
 
 interface SuggestEngine extends SearchEngine {
@@ -64,7 +94,7 @@ function isSuggestEngine(e: SearchEngine): e is SuggestEngine {
 function loadCustomEngines(): SearchEngine[] {
   if (typeof window === "undefined") return [];
   try {
-    const saved = localStorage.getItem("slate-custom-engines");
+    const saved = safeLocalStorage.getItem("slate-custom-engines");
     if (!saved) return [];
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed)) return [];
@@ -96,15 +126,15 @@ function getEngines(): SearchEngine[] {
   if (typeof window === "undefined") return all;
   try {
     let deletedIds: string[] = [];
-    const saved = localStorage.getItem("slate-deleted-engines");
+    const saved = safeLocalStorage.getItem("slate-deleted-engines");
     if (saved) {
       deletedIds = JSON.parse(saved);
     } else {
-      const oldDisabled = localStorage.getItem("slate-disabled-engines");
+      const oldDisabled = safeLocalStorage.getItem("slate-disabled-engines");
       if (oldDisabled) {
         deletedIds = JSON.parse(oldDisabled);
-        localStorage.setItem("slate-deleted-engines", JSON.stringify(deletedIds));
-        localStorage.removeItem("slate-disabled-engines");
+        safeLocalStorage.setItem("slate-deleted-engines", JSON.stringify(deletedIds));
+        safeLocalStorage.removeItem("slate-disabled-engines");
       }
     }
     if (!Array.isArray(deletedIds)) return all;
@@ -118,7 +148,7 @@ function getEngines(): SearchEngine[] {
 function loadCustomServices(): SearchEngine[] {
   if (typeof window === "undefined") return [];
   try {
-    const saved = localStorage.getItem("slate-custom-services");
+    const saved = safeLocalStorage.getItem("slate-custom-services");
     if (!saved) return [];
     const parsed = JSON.parse(saved);
     if (!Array.isArray(parsed)) return [];
@@ -138,15 +168,15 @@ function getServices(): SearchEngine[] {
   if (typeof window === "undefined") return all;
   try {
     let deletedIds: string[] = [];
-    const saved = localStorage.getItem("slate-deleted-services");
+    const saved = safeLocalStorage.getItem("slate-deleted-services");
     if (saved) {
       deletedIds = JSON.parse(saved);
     } else {
-      const oldDisabled = localStorage.getItem("slate-disabled-services");
+      const oldDisabled = safeLocalStorage.getItem("slate-disabled-services");
       if (oldDisabled) {
         deletedIds = JSON.parse(oldDisabled);
-        localStorage.setItem("slate-deleted-services", JSON.stringify(deletedIds));
-        localStorage.removeItem("slate-disabled-services");
+        safeLocalStorage.setItem("slate-deleted-services", JSON.stringify(deletedIds));
+        safeLocalStorage.removeItem("slate-disabled-services");
       } else {
         deletedIds = SERVICES.filter((p) => !p.defaultEnabled).map((p) => p.id);
       }
@@ -194,6 +224,7 @@ const FLY_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 const STAGGER_MS = 45;
 
 export default function SearchBar() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [isMounted, setIsMounted] = useState(false);
   const [activeMode, setActiveMode] = useState<"web" | "services">("web");
@@ -201,6 +232,15 @@ export default function SearchBar() {
   const [selectedWebId, setSelectedWebId] = useState("google");
   const [selectedServiceId, setSelectedServiceId] = useState("youtube");
   const [faviconError, setFaviconError] = useState(false);
+
+  const [engines, setEngines] = useState<SearchEngine[]>(() => {
+    if (typeof window === "undefined") return ENGINES;
+    return getEngines();
+  });
+  const [services, setServices] = useState<SearchEngine[]>(() => {
+    if (typeof window === "undefined") return SERVICES;
+    return getServices();
+  });
 
   const [phase, setPhase] = useState<"closed" | "open" | "closing">("closed");
   const [entered, setEntered] = useState(false);
@@ -237,7 +277,7 @@ export default function SearchBar() {
     phaseRef.current = phase;
   }, [suggestions, showSuggestions, activeIndex, phase]);
 
-  const currentItems = activeMode === "web" ? getEngines() : getServices();
+  const currentItems = activeMode === "web" ? engines : services;
   const activeEngine = currentItems.find((item) => item.id === (activeMode === "web" ? selectedWebId : selectedServiceId)) || currentItems[0];
 
   useEffect(() => {
@@ -303,6 +343,7 @@ export default function SearchBar() {
 
   useEffect(() => {
     if (!isMounted) return;
+    let active = true;
 
     if (query.startsWith("/")) {
       const command = query.slice(1).toLowerCase().trim();
@@ -341,21 +382,24 @@ export default function SearchBar() {
 
     suggestTimer.current = setTimeout(async () => {
       try {
-        const data = await jsonpFetch(
+        const data = await fetchSuggestion(
           `${activeEngine.suggestUrl}${encodeURIComponent(query.trim())}`,
           activeEngine.jsonpCallbackParam || "&callback="
         );
+        if (!active) return;
         const parsed = activeEngine.parseSuggestions(data);
         setSuggestions(parsed.slice(0, 8));
         setActiveIndex(-1);
         setShowSuggestions(true);
       } catch {
+        if (!active) return;
         setSuggestions([]);
         setShowSuggestions(false);
       }
     }, 250);
 
     return () => {
+      active = false;
       if (suggestTimer.current) clearTimeout(suggestTimer.current);
     };
   }, [query, activeEngine, activeMode, isMounted, servicesEnabled]);
@@ -368,13 +412,13 @@ export default function SearchBar() {
     if (text.startsWith("/")) {
       const cmd = text.toLowerCase().trim();
       if (cmd === "/settings") {
-        window.location.href = getSettingsUrl();
+        router.push(getSettingsUrl());
         return;
       }
       if (cmd === "/mode" && servicesEnabled) {
         const newMode = activeMode === "web" ? "services" : "web";
         setActiveMode(newMode);
-        localStorage.setItem("slate-search-mode", newMode);
+        safeLocalStorage.setItem("slate-search-mode", newMode);
         setQuery("");
         if (phase === "open") {
           setPhase("closing");
@@ -437,10 +481,10 @@ export default function SearchBar() {
   const selectEngine = (id: string) => {
     if (activeMode === "web") {
       setSelectedWebId(id);
-      localStorage.setItem("slate-search-engine-id", id);
+      safeLocalStorage.setItem("slate-search-engine-id", id);
     } else {
       setSelectedServiceId(id);
-      localStorage.setItem("slate-search-service-id", id);
+      safeLocalStorage.setItem("slate-search-service-id", id);
     }
     closePicker();
   };
@@ -468,27 +512,29 @@ export default function SearchBar() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
-    const savedEnabled = localStorage.getItem("slate-settings-services-enabled") === "true";
+    const savedEnabled = safeLocalStorage.getItem("slate-settings-services-enabled") === "true";
     setServicesEnabled(savedEnabled);
-    const savedMode = localStorage.getItem("slate-search-mode");
+    const savedMode = safeLocalStorage.getItem("slate-search-mode");
     if (savedEnabled && (savedMode === "web" || savedMode === "services")) {
       setActiveMode(savedMode);
     } else {
       setActiveMode("web");
     }
-    const savedWebId = localStorage.getItem("slate-search-engine-id");
-    const engines = getEngines();
-    if (savedWebId && engines.some((e) => e.id === savedWebId)) {
+    const savedWebId = safeLocalStorage.getItem("slate-search-engine-id");
+    const enginesList = getEngines();
+    setEngines(enginesList);
+    if (savedWebId && enginesList.some((e) => e.id === savedWebId)) {
       setSelectedWebId(savedWebId);
-    } else if (engines.length > 0) {
-      setSelectedWebId(engines[0].id);
+    } else if (enginesList.length > 0) {
+      setSelectedWebId(enginesList[0].id);
     }
-    const savedServiceId = localStorage.getItem("slate-search-service-id");
-    const services = getServices();
-    if (savedServiceId && services.some((s) => s.id === savedServiceId)) {
+    const savedServiceId = safeLocalStorage.getItem("slate-search-service-id");
+    const servicesList = getServices();
+    setServices(servicesList);
+    if (savedServiceId && servicesList.some((s) => s.id === savedServiceId)) {
       setSelectedServiceId(savedServiceId);
-    } else if (services.length > 0) {
-      setSelectedServiceId(services[0].id);
+    } else if (servicesList.length > 0) {
+      setSelectedServiceId(servicesList[0].id);
     }
 
     const isMac = typeof window !== "undefined" && 
@@ -560,33 +606,35 @@ export default function SearchBar() {
     document.addEventListener("mousedown", handleClickOutside);
 
     const handleEngineUpdate = () => {
-      const engineId = localStorage.getItem("slate-search-engine-id");
-      const engines = getEngines();
-      if (engineId && engines.some((e) => e.id === engineId)) {
+      const engineId = safeLocalStorage.getItem("slate-search-engine-id");
+      const list = getEngines();
+      setEngines(list);
+      if (engineId && list.some((e) => e.id === engineId)) {
         setSelectedWebId(engineId);
-      } else if (engines.length > 0) {
-        setSelectedWebId(engines[0].id);
+      } else if (list.length > 0) {
+        setSelectedWebId(list[0].id);
       }
     };
     window.addEventListener("slate-search-engine-updated", handleEngineUpdate);
 
     const handleServicesSettingsUpdate = () => {
-      const val = localStorage.getItem("slate-settings-services-enabled") === "true";
+      const val = safeLocalStorage.getItem("slate-settings-services-enabled") === "true";
       setServicesEnabled(val);
       if (!val) {
         setActiveMode("web");
-        localStorage.setItem("slate-search-mode", "web");
+        safeLocalStorage.setItem("slate-search-mode", "web");
       }
     };
     window.addEventListener("slate-services-settings-updated", handleServicesSettingsUpdate);
 
     const handleServicesUpdate = () => {
-      const serviceId = localStorage.getItem("slate-search-service-id");
-      const services = getServices();
-      if (serviceId && services.some((s) => s.id === serviceId)) {
+      const serviceId = safeLocalStorage.getItem("slate-search-service-id");
+      const list = getServices();
+      setServices(list);
+      if (serviceId && list.some((s) => s.id === serviceId)) {
         setSelectedServiceId(serviceId);
-      } else if (services.length > 0) {
-        setSelectedServiceId(services[0].id);
+      } else if (list.length > 0) {
+        setSelectedServiceId(list[0].id);
       }
     };
     window.addEventListener("slate-services-updated", handleServicesUpdate);
@@ -609,7 +657,7 @@ export default function SearchBar() {
     if (lowerVal === "/mode " && servicesEnabled) {
       const newMode = activeMode === "web" ? "services" : "web";
       setActiveMode(newMode);
-      localStorage.setItem("slate-search-mode", newMode);
+      safeLocalStorage.setItem("slate-search-mode", newMode);
       setQuery("");
       if (phase === "open") {
         setPhase("closing");
@@ -630,13 +678,13 @@ export default function SearchBar() {
         closePicker();
         setShowSuggestions(false);
         setActiveIndex(-1);
-        window.location.href = getSettingsUrl();
+        router.push(getSettingsUrl());
         return;
       }
       if (cmd === "/mode" && servicesEnabled) {
         const newMode = activeMode === "web" ? "services" : "web";
         setActiveMode(newMode);
-        localStorage.setItem("slate-search-mode", newMode);
+        safeLocalStorage.setItem("slate-search-mode", newMode);
         setQuery("");
         closePicker();
         setShowSuggestions(false);
@@ -708,7 +756,7 @@ export default function SearchBar() {
               type="button"
               onClick={() => {
                 setActiveMode("web");
-                localStorage.setItem("slate-search-mode", "web");
+                safeLocalStorage.setItem("slate-search-mode", "web");
                 inputRef.current?.focus();
               }}
               className={`flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold tracking-wide transition-all duration-300 cursor-pointer relative z-10 w-28 sm:w-32 ${
@@ -725,7 +773,7 @@ export default function SearchBar() {
               type="button"
               onClick={() => {
                 setActiveMode("services");
-                localStorage.setItem("slate-search-mode", "services");
+                safeLocalStorage.setItem("slate-search-mode", "services");
                 inputRef.current?.focus();
               }}
               className={`flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold tracking-wide transition-all duration-300 cursor-pointer relative z-10 w-28 sm:w-32 ${
@@ -931,7 +979,7 @@ export default function SearchBar() {
                     type="button"
                     onClick={() => {
                       setActiveMode("web");
-                      localStorage.setItem("slate-search-mode", "web");
+                      safeLocalStorage.setItem("slate-search-mode", "web");
                     }}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 relative z-10 cursor-pointer ${
                       activeMode === "web" ? "text-[var(--background)]" : "text-[var(--foreground)]/60"
@@ -944,7 +992,7 @@ export default function SearchBar() {
                     type="button"
                     onClick={() => {
                       setActiveMode("services");
-                      localStorage.setItem("slate-search-mode", "services");
+                      safeLocalStorage.setItem("slate-search-mode", "services");
                     }}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 relative z-10 cursor-pointer ${
                       activeMode === "services" ? "text-[var(--background)]" : "text-[var(--foreground)]/60"
@@ -1017,7 +1065,7 @@ export default function SearchBar() {
                 type="button"
                 onClick={() => {
                   closePicker();
-                  window.location.href = getSettingsUrl();
+                  router.push(getSettingsUrl());
                 }}
                 className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl border border-dashed border-[var(--glass-border)]/80 text-[var(--foreground)]/50 hover:bg-[var(--foreground)]/[0.03] hover:text-[var(--foreground)]/80 transition-all duration-300 cursor-pointer active:scale-95 text-center min-h-[92px]"
                 style={{

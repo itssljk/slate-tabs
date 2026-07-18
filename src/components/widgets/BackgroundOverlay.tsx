@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { getBackgroundBlob, DEFAULT_BG_SETTINGS } from "@/utils/backgroundDb";
+import { safeLocalStorage } from "@/utils/safeStorage";
 
 interface Credits {
   name: string;
@@ -18,27 +19,38 @@ export default function BackgroundOverlay() {
   const [credits, setCredits] = useState<Credits | null>(null);
 
   const objectUrlRef = useRef<string>("");
+  const isMountedRef = useRef<boolean>(true);
+  const requestCounterRef = useRef<number>(0);
 
   const loadSettings = async () => {
     if (typeof window === "undefined") return;
 
-    const type = localStorage.getItem("slate-bg-type") || DEFAULT_BG_SETTINGS.type;
-    const savedOpacity = localStorage.getItem("slate-bg-opacity")
-      ? parseInt(localStorage.getItem("slate-bg-opacity")!)
-      : DEFAULT_BG_SETTINGS.opacity;
-    const savedBlur = localStorage.getItem("slate-bg-blur")
-      ? parseInt(localStorage.getItem("slate-bg-blur")!)
-      : DEFAULT_BG_SETTINGS.blur;
-    const savedDim = localStorage.getItem("slate-bg-dim")
-      ? parseInt(localStorage.getItem("slate-bg-dim")!)
-      : DEFAULT_BG_SETTINGS.dim;
-    setBgType(type);
-    setOpacity(savedOpacity);
-    setBlur(savedBlur);
-    setDim(savedDim);
+    const currentRequestId = ++requestCounterRef.current;
 
-    // Clean up old object URL if any to prevent memory leaks
-    if (objectUrlRef.current) {
+    const type = safeLocalStorage.getItem("slate-bg-type") || DEFAULT_BG_SETTINGS.type;
+    
+    // Parse settings safely guarding against NaN
+    const rawOpacity = safeLocalStorage.getItem("slate-bg-opacity");
+    const parsedOpacity = rawOpacity ? parseInt(rawOpacity) : NaN;
+    const savedOpacity = isNaN(parsedOpacity) ? DEFAULT_BG_SETTINGS.opacity : parsedOpacity;
+
+    const rawBlur = safeLocalStorage.getItem("slate-bg-blur");
+    const parsedBlur = rawBlur ? parseInt(rawBlur) : NaN;
+    const savedBlur = isNaN(parsedBlur) ? DEFAULT_BG_SETTINGS.blur : parsedBlur;
+
+    const rawDim = safeLocalStorage.getItem("slate-bg-dim");
+    const parsedDim = rawDim ? parseInt(rawDim) : NaN;
+    const savedDim = isNaN(parsedDim) ? DEFAULT_BG_SETTINGS.dim : parsedDim;
+
+    if (isMountedRef.current) {
+      setBgType(type);
+      setOpacity(savedOpacity);
+      setBlur(savedBlur);
+      setDim(savedDim);
+    }
+
+    // Clean up old object URL immediately if we are switching away from upload type
+    if (type !== "upload" && objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = "";
     }
@@ -47,8 +59,8 @@ export default function BackgroundOverlay() {
     let creditsData: Credits | null = null;
 
     if (type === "curated") {
-      url = localStorage.getItem("slate-bg-curated-url") || "";
-      const savedCredits = localStorage.getItem("slate-bg-curated-credits");
+      url = safeLocalStorage.getItem("slate-bg-curated-url") || "";
+      const savedCredits = safeLocalStorage.getItem("slate-bg-curated-credits");
       if (savedCredits) {
         try {
           creditsData = JSON.parse(savedCredits);
@@ -57,14 +69,30 @@ export default function BackgroundOverlay() {
         }
       }
     } else if (type === "url") {
-      url = localStorage.getItem("slate-bg-url-link") || "";
+      url = safeLocalStorage.getItem("slate-bg-url-link") || "";
     } else if (type === "upload") {
       const blob = await getBackgroundBlob();
+      
+      // Ensure request is still current and component is still mounted
+      if (currentRequestId !== requestCounterRef.current || !isMountedRef.current) {
+        return;
+      }
+
       if (blob) {
+        const oldUrl = objectUrlRef.current;
         const objUrl = URL.createObjectURL(blob);
         objectUrlRef.current = objUrl;
         url = objUrl;
+        
+        // Revoke the old object URL only after creating the new one to prevent visual flicker
+        if (oldUrl) {
+          URL.revokeObjectURL(oldUrl);
+        }
       }
+    }
+
+    if (currentRequestId !== requestCounterRef.current || !isMountedRef.current) {
+      return;
     }
 
     setImageUrl(url);
@@ -78,8 +106,9 @@ export default function BackgroundOverlay() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    isMountedRef.current = true;
     loadSettings();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
     const handleUpdate = () => {
@@ -89,6 +118,7 @@ export default function BackgroundOverlay() {
     window.addEventListener("slate-background-updated", handleUpdate);
     window.addEventListener("slate-theme-updated", handleUpdate);
     return () => {
+      isMountedRef.current = false;
       window.removeEventListener("slate-background-updated", handleUpdate);
       window.removeEventListener("slate-theme-updated", handleUpdate);
       if (objectUrlRef.current) {
@@ -135,7 +165,7 @@ export default function BackgroundOverlay() {
             href={`${credits.url}?utm_source=slate_tabs&utm_medium=referral`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#030307]/35 hover:bg-[#030307]/55 backdrop-blur-md border border-white/5 text-[9px] tracking-wider uppercase font-medium text-white/70 hover:text-white transition-all duration-300 shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#030307]/60 hover:bg-[#030307]/80 backdrop-blur-md border border-white/10 text-[9px] tracking-wider uppercase font-medium text-white hover:text-[var(--accent)] transition-all duration-300 shadow-sm"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#7ca38e]" />
             Photo by {credits.name} on Unsplash

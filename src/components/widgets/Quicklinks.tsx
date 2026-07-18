@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Pencil, X, Trash2 } from "lucide-react";
 import { DEFAULT_QUICKLINKS, getDomain, type Quicklink } from "@/utils/quicklinks";
+import { safeLocalStorage } from "@/utils/safeStorage";
 
 function Favicon({ url, title }: { url: string; title: string }) {
   const [error, setError] = useState(false);
@@ -32,19 +33,19 @@ export default function Quicklinks() {
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(() => {
     if (typeof window === "undefined") return true;
-    return localStorage.getItem("slate-settings-quicklinks") !== "false";
+    return safeLocalStorage.getItem("slate-settings-quicklinks") !== "false";
   });
   const [showLabels, setShowLabels] = useState(() => {
     if (typeof window === "undefined") return true;
-    return localStorage.getItem("slate-settings-quicklinks-labels") !== "false";
+    return safeLocalStorage.getItem("slate-settings-quicklinks-labels") !== "false";
   });
   const [showAddButton, setShowAddButton] = useState(() => {
     if (typeof window === "undefined") return true;
-    return localStorage.getItem("slate-settings-quicklinks-add-button") !== "false";
+    return safeLocalStorage.getItem("slate-settings-quicklinks-add-button") !== "false";
   });
   const [links, setLinks] = useState<Quicklink[]>(() => {
     if (typeof window === "undefined") return [];
-    const savedLinks = localStorage.getItem("slate-quicklinks");
+    const savedLinks = safeLocalStorage.getItem("slate-quicklinks");
     if (savedLinks) {
       try {
         return JSON.parse(savedLinks);
@@ -64,6 +65,7 @@ export default function Quicklinks() {
   const [editingLink, setEditingLink] = useState<Quicklink | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -72,21 +74,21 @@ export default function Quicklinks() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
-    if (typeof window !== "undefined" && !localStorage.getItem("slate-quicklinks")) {
-      localStorage.setItem("slate-quicklinks", JSON.stringify(DEFAULT_QUICKLINKS));
+    if (typeof window !== "undefined" && !safeLocalStorage.getItem("slate-quicklinks")) {
+      safeLocalStorage.setItem("slate-quicklinks", JSON.stringify(DEFAULT_QUICKLINKS));
     }
 
     const handleUpdate = () => {
-      const savedVisible = localStorage.getItem("slate-settings-quicklinks") !== "false";
+      const savedVisible = safeLocalStorage.getItem("slate-settings-quicklinks") !== "false";
       setVisible(savedVisible);
 
-      const savedLabels = localStorage.getItem("slate-settings-quicklinks-labels") !== "false";
+      const savedLabels = safeLocalStorage.getItem("slate-settings-quicklinks-labels") !== "false";
       setShowLabels(savedLabels);
 
-      const savedAddButton = localStorage.getItem("slate-settings-quicklinks-add-button") !== "false";
+      const savedAddButton = safeLocalStorage.getItem("slate-settings-quicklinks-add-button") !== "false";
       setShowAddButton(savedAddButton);
 
-      const savedLinks = localStorage.getItem("slate-quicklinks");
+      const savedLinks = safeLocalStorage.getItem("slate-quicklinks");
       if (savedLinks) {
         try {
           setLinks(JSON.parse(savedLinks));
@@ -106,6 +108,7 @@ export default function Quicklinks() {
     setEditingLink(null);
     setNameInput("");
     setUrlInput("");
+    setModalError(null);
     setIsModalOpen(true);
     setTimeout(() => nameInputRef.current?.focus(), 50);
   };
@@ -114,6 +117,7 @@ export default function Quicklinks() {
     setEditingLink(link);
     setNameInput(link.title);
     setUrlInput(link.url);
+    setModalError(null);
     setIsModalOpen(true);
     setTimeout(() => nameInputRef.current?.focus(), 50);
   };
@@ -123,6 +127,7 @@ export default function Quicklinks() {
     setEditingLink(null);
     setNameInput("");
     setUrlInput("");
+    setModalError(null);
   };
 
   useEffect(() => {
@@ -159,8 +164,7 @@ export default function Quicklinks() {
       );
     } else {
       if (links.length >= 12) {
-        alert("Maximum limit of 12 shortcuts reached.");
-        closeModal();
+        setModalError("Maximum limit of 12 shortcuts reached.");
         return;
       }
       const newLink: Quicklink = {
@@ -172,7 +176,7 @@ export default function Quicklinks() {
     }
 
     setLinks(updatedLinks);
-    localStorage.setItem("slate-quicklinks", JSON.stringify(updatedLinks));
+    safeLocalStorage.setItem("slate-quicklinks", JSON.stringify(updatedLinks));
     closeModal();
   };
 
@@ -180,7 +184,7 @@ export default function Quicklinks() {
     if (!editingLink) return;
     const updatedLinks = links.filter((link) => link.id !== editingLink.id);
     setLinks(updatedLinks);
-    localStorage.setItem("slate-quicklinks", JSON.stringify(updatedLinks));
+    safeLocalStorage.setItem("slate-quicklinks", JSON.stringify(updatedLinks));
     closeModal();
   };
 
@@ -195,6 +199,7 @@ export default function Quicklinks() {
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedIndexRef.current === null || draggedIndexRef.current === index) return;
+    if (dragOverIndexRef.current === index) return;
     setDragOverIndex(index);
     dragOverIndexRef.current = index;
   };
@@ -216,7 +221,7 @@ export default function Quicklinks() {
     reordered.splice(index, 0, draggedItem);
 
     setLinks(reordered);
-    localStorage.setItem("slate-quicklinks", JSON.stringify(reordered));
+    safeLocalStorage.setItem("slate-quicklinks", JSON.stringify(reordered));
     setDraggedIndex(null);
     setDragOverIndex(null);
     draggedIndexRef.current = null;
@@ -308,6 +313,12 @@ export default function Quicklinks() {
             <h3 className="text-base font-semibold text-[var(--foreground)]">
               {editingLink ? "Edit Quicklink" : "Add Quicklink"}
             </h3>
+
+            {modalError && (
+              <div className="p-3 text-xs text-rose-500 bg-rose-500/10 rounded-xl border border-rose-500/20">
+                {modalError}
+              </div>
+            )}
 
             <form onSubmit={handleSave} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
